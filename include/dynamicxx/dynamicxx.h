@@ -1,18 +1,19 @@
 #ifndef DYNAMICXX_DYNAMICXX_H
 #define DYNAMICXX_DYNAMICXX_H
 
+#include <cassert>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
 #include <type_traits>
+#include <unordered_map>
+#include <vector>
+
 #ifdef _MSVC_LANG
 #define DCXX_LANG (_MSVC_LANG)
 #else
 #define DCXX_LANG (__cplusplus)
 #endif
-
-#include <cstdint>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 #define HAS_CXX_14 (DCXX_LANG >= 201402UL)
 #define HAS_CXX_17 (DCXX_LANG >= 201703UL)
@@ -24,6 +25,12 @@
 #define DCONSTEXPR_14
 #endif
 
+#if HAS_CXX_17
+#define DNODISCARD [[nodiscard]]
+#else
+#define DNODISCARD
+#endif
+
 #if HAS_CXX_20
 #define LIKELY [[likely]]
 #define UNLIKELY [[unlikely]]
@@ -31,6 +38,11 @@
 #define LIKELY
 #define UNLIKELY
 #endif
+
+#define DDO_ASSERT(...)      \
+    do {                     \
+        assert(__VA_ARGS__); \
+    } while (false)
 
 namespace dynamicxx {
 
@@ -61,6 +73,11 @@ class BasicDynamic {
     using Object = ObjectContainerType<std::string, BasicDynamic>;
     struct Invalid {};
 
+    static_assert(std::is_integral<Integer>::value,
+                  "Integer type provided must be an integral type");
+    static_assert(std::is_floating_point<Number>::value,
+                  "Number type provided must be a floating point type");
+
     template <class Type>
     struct BestFitFor;
 
@@ -89,11 +106,6 @@ class BasicDynamic {
                               std::is_constructible<Object, Type>::value,
                               Object, void>::type>::type>::type>::type>::type> {
     };
-
-    static_assert(std::is_integral<Integer>::value,
-                  "Integer type provided must be an integral type");
-    static_assert(std::is_floating_point<Number>::value,
-                  "Number type provided must be a floating point type");
 
    private:
     using TagRepr = std::uint32_t;
@@ -127,7 +139,7 @@ class BasicDynamic {
     struct TagOfHelper<Object> : TagIdentity<Tag::Object> {};
 
     template <class Type>
-    static constexpr Tag TagOf() noexcept {
+    DNODISCARD static constexpr Tag TagOf() noexcept {
         return TagOfHelper<Type>::value;
     }
 
@@ -164,16 +176,26 @@ class BasicDynamic {
             return *this;
         }
 
-        constexpr bool HoldsInteger() const noexcept {
+        DNODISCARD constexpr bool HoldsInteger() const noexcept {
             return Holds<Integer>();
         }
-        constexpr bool HoldsNumber() const noexcept { return Holds<Number>(); }
-        constexpr bool HoldsString() const noexcept { return Holds<String>(); }
-        constexpr bool HoldsArray() const noexcept { return Holds<Array>(); }
-        constexpr bool HoldsObject() const noexcept { return Holds<Object>(); }
-        constexpr bool HoldsNull() const noexcept { return Holds<Null>(); }
+        DNODISCARD constexpr bool HoldsNumber() const noexcept {
+            return Holds<Number>();
+        }
+        DNODISCARD constexpr bool HoldsString() const noexcept {
+            return Holds<String>();
+        }
+        DNODISCARD constexpr bool HoldsArray() const noexcept {
+            return Holds<Array>();
+        }
+        DNODISCARD constexpr bool HoldsObject() const noexcept {
+            return Holds<Object>();
+        }
+        DNODISCARD constexpr bool HoldsNull() const noexcept {
+            return Holds<Null>();
+        }
 
-        DCONSTEXPR_14 Integer GetInteger() const {
+        DNODISCARD DCONSTEXPR_14 Integer GetInteger() const {
             if (HoldsInteger()) LIKELY {
                     return payload_.integer;
                 }
@@ -181,7 +203,7 @@ class BasicDynamic {
                 UNLIKELY { InvalidAccess(); }
         }
 
-        DCONSTEXPR_14 Number GetNumber() const {
+        DNODISCARD DCONSTEXPR_14 Number GetNumber() const {
             if (HoldsNumber()) LIKELY {
                     return payload_.number;
                 }
@@ -189,14 +211,14 @@ class BasicDynamic {
                 UNLIKELY { InvalidAccess(); }
         }
 
-        DCONSTEXPR_14 String& GetString() {
+        DNODISCARD DCONSTEXPR_14 String& GetString() {
             if (HoldsString()) LIKELY {
                     return payload_.string;
                 }
             else
                 UNLIKELY { InvalidAccess(); }
         }
-        DCONSTEXPR_14 const String& GetString() const {
+        DNODISCARD DCONSTEXPR_14 const String& GetString() const {
             if (HoldsString()) LIKELY {
                     return payload_.string;
                 }
@@ -204,14 +226,14 @@ class BasicDynamic {
                 UNLIKELY { InvalidAccess(); }
         }
 
-        DCONSTEXPR_14 Array& GetArray() {
+        DNODISCARD DCONSTEXPR_14 Array& GetArray() {
             if (HoldsArray()) LIKELY {
                     return payload_.array;
                 }
             else
                 UNLIKELY { InvalidAccess(); }
         }
-        DCONSTEXPR_14 const Array& GetArray() const {
+        DNODISCARD DCONSTEXPR_14 const Array& GetArray() const {
             if (HoldsArray()) LIKELY {
                     return payload_.array;
                 }
@@ -219,14 +241,14 @@ class BasicDynamic {
                 UNLIKELY { InvalidAccess(); }
         }
 
-        DCONSTEXPR_14 Object& GetObject() {
+        DNODISCARD DCONSTEXPR_14 Object& GetObject() {
             if (HoldsObject()) LIKELY {
                     return payload_.object;
                 }
             else
                 UNLIKELY { InvalidAccess(); }
         }
-        DCONSTEXPR_14 const Object& GetObject() const {
+        DNODISCARD DCONSTEXPR_14 const Object& GetObject() const {
             if (HoldsObject()) LIKELY {
                     return payload_.object;
                 }
@@ -234,7 +256,7 @@ class BasicDynamic {
                 UNLIKELY { InvalidAccess(); }
         }
 
-        DCONSTEXPR_14 Null GetNull() const {
+        DNODISCARD DCONSTEXPR_14 Null GetNull() const {
             if (HoldsNull()) LIKELY {
                     return payload_.null;
                 }
@@ -270,43 +292,53 @@ class BasicDynamic {
 
         template <>
         struct Caster<Integer> {
-            static Integer& As(Impl& impl) { return impl.payload_.integer; }
-            static const Integer& As(const Impl& impl) {
+            DNODISCARD static Integer& As(Impl& impl) {
+                return impl.payload_.integer;
+            }
+            DNODISCARD static const Integer& As(const Impl& impl) {
                 return impl.payload_.integer;
             }
         };
         template <>
         struct Caster<Number> {
-            static Number& As(Impl& impl) { return impl.payload_.number; }
-            static const Number& As(const Impl& impl) {
+            DNODISCARD static Number& As(Impl& impl) {
+                return impl.payload_.number;
+            }
+            DNODISCARD static const Number& As(const Impl& impl) {
                 return impl.payload_.number;
             }
         };
         template <>
         struct Caster<String> {
-            static String& As(Impl& impl) { return impl.payload_.string; }
-            static const String& As(const Impl& impl) {
+            DNODISCARD static String& As(Impl& impl) {
+                return impl.payload_.string;
+            }
+            DNODISCARD static const String& As(const Impl& impl) {
                 return impl.payload_.string;
             }
         };
         template <>
         struct Caster<Array> {
-            static Array& As(Impl& impl) { return impl.payload_.array; }
-            static const Array& As(const Impl& impl) {
+            DNODISCARD static Array& As(Impl& impl) {
+                return impl.payload_.array;
+            }
+            DNODISCARD static const Array& As(const Impl& impl) {
                 return impl.payload_.array;
             }
         };
         template <>
         struct Caster<Object> {
-            static Object& As(Impl& impl) { return impl.payload_.object; }
-            static const Object& As(const Impl& impl) {
+            DNODISCARD static Object& As(Impl& impl) {
+                return impl.payload_.object;
+            }
+            DNODISCARD static const Object& As(const Impl& impl) {
                 return impl.payload_.object;
             }
         };
 
        public:
         template <class CastType>
-        CastType& As() {
+        DNODISCARD CastType& As() {
             if (Holds<CastType>()) {
                 return Caster<CastType>::As(*this);
             } else {
@@ -315,7 +347,7 @@ class BasicDynamic {
         }
 
         template <class CastType>
-        const CastType& As() const {
+        DNODISCARD const CastType& As() const {
             if (Holds<CastType>()) {
                 return Caster<CastType>::As(*this);
             } else {
@@ -323,9 +355,39 @@ class BasicDynamic {
             }
         }
 
+        DNODISCARD DCONSTEXPR_14 bool Equals(const Impl& that) const {
+            DDO_ASSERT(tag_ == that.tag_);
+            switch (tag_) {
+                case Tag::Null: {
+                    return true;
+                }
+                case Tag::Integer: {
+                    return payload_.integer == that.payload_.integer;
+                }
+                case Tag::Number: {
+                    return payload_.number == that.payload_.number;
+                }
+                case Tag::String: {
+                    return payload_.string == that.payload_.string;
+                }
+                case Tag::Array: {
+                    return payload_.array == that.payload_.array;
+                }
+                case Tag::Object: {
+                    return payload_.object == that.payload_.object;
+                }
+                case Tag::Invalid: {
+                    return true;
+                }
+
+                default:
+                    ThrowInvalidTerminatingTag();
+            }
+        }
+
        private:
         template <class WantedTag>
-        constexpr bool Holds() const noexcept {
+        DNODISCARD constexpr bool Holds() const noexcept {
             return tag_ == TagOf<WantedTag>();
         }
 
@@ -439,16 +501,18 @@ class BasicDynamic {
             tag_ = TagOf<Type>();
         }
 
-       public:
         Tag tag_ = Tag::Invalid;
         Payload payload_{};
+
+       private:
+        friend BasicDynamic;
     };
 
    public:
     BasicDynamic() {}
 
     template <class Type, class... Args>
-    static BasicDynamic From(Args&&... args) {
+    DNODISCARD static BasicDynamic From(Args&&... args) {
         BasicDynamic dynamic;
         dynamic.Emplace<Type>(std::forward<Args>(args)...);
         return dynamic;
@@ -459,50 +523,117 @@ class BasicDynamic {
         impl_.template Emplace<Type>(std::forward<Args>(args)...);
     }
 
-    DCONSTEXPR_14 Integer GetInteger() const { return impl_.GetInteger(); }
+    DNODISCARD constexpr bool IsInteger() const noexcept {
+        return impl_.HoldsInteger();
+    }
+    DNODISCARD constexpr bool IsNumber() const noexcept {
+        return impl_.HoldsNumber();
+    }
+    DNODISCARD constexpr bool IsString() const noexcept {
+        return impl_.HoldsString();
+    }
+    DNODISCARD constexpr bool IsArray() const noexcept {
+        return impl_.HoldsArray();
+    }
+    DNODISCARD constexpr bool IsObject() const noexcept {
+        return impl_.HoldsObject();
+    }
 
-    DCONSTEXPR_14 Number GetNumber() const { return impl_.GetNumber(); }
+    DNODISCARD DCONSTEXPR_14 Integer GetInteger() const {
+        return impl_.GetInteger();
+    }
 
-    DCONSTEXPR_14 String& GetString() { return impl_.GetString(); }
-    DCONSTEXPR_14 const String& GetString() const { return impl_.GetString(); }
+    DNODISCARD DCONSTEXPR_14 Number GetNumber() const {
+        return impl_.GetNumber();
+    }
 
-    DCONSTEXPR_14 Array& GetArray() { return impl_.GetArray(); }
-    DCONSTEXPR_14 const Array& GetArray() const { return impl_.GetArray(); }
+    DNODISCARD DCONSTEXPR_14 String& GetString() { return impl_.GetString(); }
+    DNODISCARD DCONSTEXPR_14 const String& GetString() const {
+        return impl_.GetString();
+    }
 
-    DCONSTEXPR_14 Object& GetObject() { return impl_.GetObject(); }
-    DCONSTEXPR_14 const Object& GetObject() const { return impl_.GetObject(); }
+    DNODISCARD DCONSTEXPR_14 Array& GetArray() { return impl_.GetArray(); }
+    DNODISCARD DCONSTEXPR_14 const Array& GetArray() const {
+        return impl_.GetArray();
+    }
 
-    DCONSTEXPR_14 Null GetNull() const { return impl_.GetNull(); }
+    DNODISCARD DCONSTEXPR_14 Object& GetObject() { return impl_.GetObject(); }
+    DNODISCARD DCONSTEXPR_14 const Object& GetObject() const {
+        return impl_.GetObject();
+    }
+
+    DNODISCARD DCONSTEXPR_14 Null GetNull() const { return impl_.GetNull(); }
 
     template <class CastType>
-    CastType& As() {
+    DNODISCARD CastType& As() {
         return impl_.template As<CastType>();
     }
 
     template <class CastType>
-    const CastType& As() const {
+    DNODISCARD const CastType& As() const {
         return impl_.template As<CastType>();
     }
 
     template <class CastType>
-    operator CastType&() {
+    DNODISCARD operator CastType&() {
         return As<CastType>();
     }
 
     template <class CastType>
-    operator const CastType&() const {
+    DNODISCARD operator const CastType&() const {
         return As<CastType>();
     }
 
     template <class CastType>
-    operator CastType() const {
+    DNODISCARD operator CastType() const {
         return As<CastType>();
+    }
+
+    DNODISCARD DCONSTEXPR_14 bool Equals(
+        const BasicDynamic& rhs) const noexcept {
+        if (impl_.tag_ != rhs.impl_.tag_) {
+            return false;
+        }
+        return impl_.Equals(rhs.impl_);
     }
 
     template <class Type>
-    BasicDynamic& operator=(const Type& value) {
-        Emplace<typename BestFitFor<Type>::type>(value);
+    DNODISCARD DCONSTEXPR_14 bool Equals(const Type& that) const noexcept {
+        using CastType = typename BestFitFor<typename std::remove_cv<
+            typename std::remove_reference<Type>::type>::type>::type;
+        if (!impl_.template Holds<CastType>()) {
+            return false;
+        }
+        return As<CastType>() == that;
+    }
+
+    template <class Type>
+    DNODISCARD friend DCONSTEXPR_14 bool operator==(const BasicDynamic& lhs,
+                                                    Type&& rhs) noexcept {
+        return lhs.Equals(rhs);
+    }
+
+    template <class Type>
+    BasicDynamic& operator=(Type&& value) {
+        Emplace<typename BestFitFor<typename std::remove_cv<
+            typename std::remove_reference<Type>::type>::type>::type>(value);
         return *this;
+    }
+
+    template <class Key>
+    DNODISCARD BasicDynamic& operator[](const Key& key) {
+        return As<Object>()[key];
+    }
+
+    template <class Key>
+    DNODISCARD const BasicDynamic& operator[](const Key& key) const {
+        return As<Object>().at(key);
+    }
+
+    template <class Key>
+    DNODISCARD bool Contains(const Key& key) const {
+        const auto& self = As<Object>();
+        return self.find(key) != self.end();
     }
 
    private:
