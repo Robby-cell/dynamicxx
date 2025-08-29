@@ -15,32 +15,33 @@ This project uses CMake to build examples and tests.
 
 1.  Clone the repository:
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/Robby-cell/dynamicxx.git
     cd dynamicxx
     ```
 
-2.  Create a build directory:
+2.  Configure and build:
     ```bash
-    mkdir build
-    cd build
+    cmake . --preset="debug"
+    cmake --build . --preset="default"
     ```
 
-3.  Configure and build:
+3.  Run examples and tests:
     ```bash
-    cmake ..
-    cmake --build .
-    ```
-
-4.  Run examples and tests:
-    ```bash
-    ./example
-    ./run_tests
+    ./build/Debug/example
+    ./build/Debug/run_tests
     ```
 
 ## Usage
 
 To use this library, simply add the `include` directory to your project's include paths.
 ```cpp
-#include "dynamicxx/dynamicxx.hpp"
-// ...
+#include "dynamicxx/dynamicxx.h"
+#include <iostream>
+
+int main() {
+    using dynamicxx::Dynamic;
+
+    Dynamic dynamic = Dynamic::From<Dynamic::String>("Hello, world!");
+    std::cout << dynamic.GetString() << '\n';
+}
 ```
