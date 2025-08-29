@@ -2,6 +2,7 @@
 #define DYNAMICXX_DYNAMICXX_H
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -72,7 +73,7 @@ class BasicDynamic {
     using String = StringType;
     using Array = ArrayContainerType<BasicDynamic>;
     using Object = ObjectContainerType<std::string, BasicDynamic>;
-    struct Invalid {};
+    struct Undefined {};
 
     static_assert(std::is_integral<Integer>::value,
                   "Integer type provided must be an integral type");
@@ -82,6 +83,8 @@ class BasicDynamic {
     template <class Type>
     struct BestFitFor;
 
+    template <>
+    struct BestFitFor<Boolean> : detail::TypeIdentity<Boolean> {};
     template <>
     struct BestFitFor<Integer> : detail::TypeIdentity<Integer> {};
     template <>
@@ -96,7 +99,7 @@ class BasicDynamic {
     template <class Type>
     struct BestFitFor
         : BestFitFor<typename std::conditional<
-              std::is_same<bool, Type>::value, bool,
+              std::is_same<bool, Type>::value, Boolean,
               typename std::conditional<
                   std::is_integral<Type>::value, Integer,
                   typename std::conditional<
@@ -120,7 +123,7 @@ class BasicDynamic {
         String,
         Array,
         Object,
-        Invalid = ~static_cast<TagRepr>(0),
+        Undefined = ~static_cast<TagRepr>(0),
     };
 
     template <Tag MyTag>
@@ -143,6 +146,8 @@ class BasicDynamic {
     struct TagOfHelper<Array> : TagIdentity<Tag::Array> {};
     template <>
     struct TagOfHelper<Object> : TagIdentity<Tag::Object> {};
+    template <>
+    struct TagOfHelper<Undefined> : TagIdentity<Tag::Undefined> {};
 
     template <class Type>
     DNODISCARD static constexpr Tag TagOf() noexcept {
@@ -160,7 +165,7 @@ class BasicDynamic {
         String string;
         Array array;
         Object object;
-        Invalid invalid = {};
+        Undefined undefined = {};
     };
 
     struct Impl {
@@ -183,6 +188,9 @@ class BasicDynamic {
             return *this;
         }
 
+        DNODISCARD constexpr bool HoldsNull() const noexcept {
+            return Holds<Null>();
+        }
         DNODISCARD constexpr bool HoldsBoolean() const noexcept {
             return Holds<Boolean>();
         }
@@ -201,8 +209,8 @@ class BasicDynamic {
         DNODISCARD constexpr bool HoldsObject() const noexcept {
             return Holds<Object>();
         }
-        DNODISCARD constexpr bool HoldsNull() const noexcept {
-            return Holds<Null>();
+        DNODISCARD constexpr bool HoldsUndefined() const noexcept {
+            return Holds<Undefined>();
         }
 
         DNODISCARD DCONSTEXPR_14 Boolean GetBoolean() const {
@@ -414,7 +422,7 @@ class BasicDynamic {
                 case Tag::Object: {
                     return payload_.object == that.payload_.object;
                 }
-                case Tag::Invalid: {
+                case Tag::Undefined: {
                     return true;
                 }
 
@@ -428,6 +436,8 @@ class BasicDynamic {
         DNODISCARD constexpr bool Holds() const noexcept {
             return tag_ == TagOf<WantedTag>();
         }
+
+        void MoveRaw(Impl&& that) noexcept { return MoveRaw(that); }
 
         void MoveRaw(Impl& that) noexcept {
             tag_ = that.tag_;
@@ -459,7 +469,7 @@ class BasicDynamic {
                     EmplaceRaw<Object>(std::move(that.payload_.object));
                     break;
                 }
-                case Tag::Invalid: {
+                case Tag::Undefined: {
                     break;
                 }
 
@@ -496,7 +506,7 @@ class BasicDynamic {
                     EmplaceRaw<Object>(that.payload_.object);
                     break;
                 }
-                case Tag::Invalid: {
+                case Tag::Undefined: {
                     break;
                 }
 
@@ -511,7 +521,9 @@ class BasicDynamic {
 
         void DestroyIfNeeded() noexcept {
             switch (tag_) {
-                case Tag::Null:
+                case Tag::Null: {
+                    payload_.null.~Null();
+                }
                 case Tag::Integer: {
                     payload_.integer.~Integer();
                     break;
@@ -532,14 +544,15 @@ class BasicDynamic {
                     payload_.object.~Object();
                     break;
                 }
-                case Tag::Invalid: {
+                case Tag::Undefined: {
+                    payload_.undefined.~Undefined();
                     break;
                 }
 
                 default:
                     ThrowInvalidTerminatingTag();
             }
-            tag_ = Tag::Invalid;
+            tag_ = Tag::Undefined;
         }
 
         template <class Type, class... Args>
@@ -548,7 +561,7 @@ class BasicDynamic {
             tag_ = TagOf<Type>();
         }
 
-        Tag tag_ = Tag::Invalid;
+        Tag tag_ = Tag::Undefined;
         Payload payload_{};
 
        private:
@@ -570,6 +583,9 @@ class BasicDynamic {
         impl_.template Emplace<Type>(std::forward<Args>(args)...);
     }
 
+    DNODISCARD constexpr bool IsNull() const noexcept {
+        return impl_.HoldsNull();
+    }
     DNODISCARD constexpr bool IsBoolean() const noexcept {
         return impl_.HoldsBool();
     }
@@ -588,6 +604,11 @@ class BasicDynamic {
     DNODISCARD constexpr bool IsObject() const noexcept {
         return impl_.HoldsObject();
     }
+    DNODISCARD constexpr bool IsUndefined() const noexcept {
+        return impl_.HoldsUndefined();
+    }
+
+    DNODISCARD DCONSTEXPR_14 Null GetNull() const { return impl_.GetNull(); }
 
     DNODISCARD DCONSTEXPR_14 Boolean GetBoolean() const {
         return impl_.GetBoolean();
@@ -616,7 +637,9 @@ class BasicDynamic {
         return impl_.GetObject();
     }
 
-    DNODISCARD DCONSTEXPR_14 Null GetNull() const { return impl_.GetNull(); }
+    DNODISCARD DCONSTEXPR_14 Undefined GetUndefined() const {
+        return impl_.GetUndefined();
+    }
 
     template <class CastType>
     DNODISCARD CastType& As() {
@@ -670,7 +693,8 @@ class BasicDynamic {
     template <class Type>
     BasicDynamic& operator=(Type&& value) {
         Emplace<typename BestFitFor<typename std::remove_cv<
-            typename std::remove_reference<Type>::type>::type>::type>(value);
+            typename std::remove_reference<Type>::type>::type>::type>(
+            std::forward<Type>(value));
         return *this;
     }
 
@@ -687,6 +711,67 @@ class BasicDynamic {
     template <class Key>
     DNODISCARD const BasicDynamic& At(const Key& key) const {
         return As<Object>().at(key);
+    }
+
+    DNODISCARD BasicDynamic& AtIndex(const std::size_t index) {
+        return As<Array>().at(index);
+    }
+    DNODISCARD const BasicDynamic& AtIndex(const std::size_t index) const {
+        return As<Array>().at(index);
+    }
+
+    DNODISCARD BasicDynamic& operator[](const std::size_t index) {
+        return AtIndex(index);
+    }
+    DNODISCARD const BasicDynamic& operator[](const std::size_t index) const {
+        return AtIndex(index);
+    }
+    DNODISCARD BasicDynamic& operator[](const std::ptrdiff_t index) {
+        return AtIndex(index);
+    }
+    DNODISCARD const BasicDynamic& operator[](
+        const std::ptrdiff_t index) const {
+        return AtIndex(index);
+    }
+    DNODISCARD BasicDynamic& operator[](const std::uint32_t index) {
+        return AtIndex(index);
+    }
+    DNODISCARD const BasicDynamic& operator[](const std::uint32_t index) const {
+        return AtIndex(index);
+    }
+    DNODISCARD BasicDynamic& operator[](const std::int32_t index) {
+        return AtIndex(index);
+    }
+    DNODISCARD const BasicDynamic& operator[](const std::int32_t index) const {
+        return AtIndex(index);
+    }
+    DNODISCARD BasicDynamic& operator[](const std::uint16_t index) {
+        return AtIndex(index);
+    }
+    DNODISCARD const BasicDynamic& operator[](const std::uint16_t index) const {
+        return AtIndex(index);
+    }
+    DNODISCARD BasicDynamic& operator[](const std::int16_t index) {
+        return AtIndex(index);
+    }
+    DNODISCARD const BasicDynamic& operator[](const std::int16_t index) const {
+        return AtIndex(index);
+    }
+
+    template <class Type>
+    void Push(Type&& value) {
+        auto& array = As<Array>();
+        array.emplace_back(
+            BasicDynamic::From<typename BestFitFor<typename std::remove_cv<
+                typename std::remove_reference<Type>::type>::type>::type>(
+                std::forward<Type>(value)));
+    }
+
+    DNODISCARD BasicDynamic Pop() {
+        auto& array = As<Array>();
+        auto back = std::move(array.back());
+        array.pop_back();
+        return back;
     }
 
     template <class Key>
