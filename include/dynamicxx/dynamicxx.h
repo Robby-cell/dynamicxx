@@ -34,20 +34,66 @@
 
 namespace dynamicxx {
 
+namespace detail {
+
+template <class Type>
+struct TypeIdentity {
+    using type = Type;  // NOLINT
+};
+
+}  // namespace detail
+
 class InvalidAccessException : std::runtime_error {
    public:
     using std::runtime_error::runtime_error;
 };
 
-class Dynamic {
+template <class IntegerType, class NumberType, class StringType,
+          template <class...> class ArrayContainerType,
+          template <class...> class ObjectContainerType>
+class BasicDynamic {
    public:
     struct Null {};
-    using Integer = std::int64_t;
-    using Number = double;
-    using String = std::string;
-    using Array = std::vector<Dynamic>;
-    using Object = std::unordered_map<std::string, Dynamic>;
+    using Integer = IntegerType;
+    using Number = NumberType;
+    using String = StringType;
+    using Array = ArrayContainerType<BasicDynamic>;
+    using Object = ObjectContainerType<std::string, BasicDynamic>;
     struct Invalid {};
+
+    template <class Type>
+    struct BestFitFor;
+
+    template <>
+    struct BestFitFor<Integer> : detail::TypeIdentity<Integer> {};
+    template <>
+    struct BestFitFor<Number> : detail::TypeIdentity<Number> {};
+    template <>
+    struct BestFitFor<String> : detail::TypeIdentity<String> {};
+    template <>
+    struct BestFitFor<Array> : detail::TypeIdentity<Array> {};
+    template <>
+    struct BestFitFor<Object> : detail::TypeIdentity<Object> {};
+
+    template <class Type>
+    struct BestFitFor
+        : BestFitFor<typename std::conditional<
+              std::is_integral<Type>::value, Integer,
+              typename std::conditional<
+                  std::is_floating_point<Type>::value, Number,
+                  typename std::conditional<
+                      std::is_constructible<String, Type>::value, String,
+                      typename std::conditional<
+                          std::is_constructible<Array, Type>::value, Array,
+                          typename std::conditional<
+                              std::is_constructible<Object, Type>::value,
+                              Object, void>::type>::type>::type>::type>::type> {
+    };
+
+    static_assert(std::is_integral<Integer>::value,
+                  "Integer type provided must be an integral type");
+    static_assert(std::is_floating_point<Number>::value,
+                  "Number type provided must be a floating point type");
 
    private:
     using TagRepr = std::uint32_t;
@@ -213,6 +259,71 @@ class Dynamic {
         }
 
        private:
+        template <class CastType>
+        struct Caster;
+
+        friend Caster<Integer>;
+        friend Caster<Number>;
+        friend Caster<String>;
+        friend Caster<Array>;
+        friend Caster<Object>;
+
+        template <>
+        struct Caster<Integer> {
+            static Integer& As(Impl& impl) { return impl.payload_.integer; }
+            static const Integer& As(const Impl& impl) {
+                return impl.payload_.integer;
+            }
+        };
+        template <>
+        struct Caster<Number> {
+            static Number& As(Impl& impl) { return impl.payload_.number; }
+            static const Number& As(const Impl& impl) {
+                return impl.payload_.number;
+            }
+        };
+        template <>
+        struct Caster<String> {
+            static String& As(Impl& impl) { return impl.payload_.string; }
+            static const String& As(const Impl& impl) {
+                return impl.payload_.string;
+            }
+        };
+        template <>
+        struct Caster<Array> {
+            static Array& As(Impl& impl) { return impl.payload_.array; }
+            static const Array& As(const Impl& impl) {
+                return impl.payload_.array;
+            }
+        };
+        template <>
+        struct Caster<Object> {
+            static Object& As(Impl& impl) { return impl.payload_.object; }
+            static const Object& As(const Impl& impl) {
+                return impl.payload_.object;
+            }
+        };
+
+       public:
+        template <class CastType>
+        CastType& As() {
+            if (Holds<CastType>()) {
+                return Caster<CastType>::As(*this);
+            } else {
+                InvalidAccess();
+            }
+        }
+
+        template <class CastType>
+        const CastType& As() const {
+            if (Holds<CastType>()) {
+                return Caster<CastType>::As(*this);
+            } else {
+                InvalidAccess();
+            }
+        }
+
+       private:
         template <class WantedTag>
         constexpr bool Holds() const noexcept {
             return tag_ == TagOf<WantedTag>();
@@ -292,8 +403,12 @@ class Dynamic {
         void DestroyIfNeeded() noexcept {
             switch (tag_) {
                 case Tag::Null:
-                case Tag::Integer:
+                case Tag::Integer: {
+                    payload_.integer.~Integer();
+                    break;
+                }
                 case Tag::Number: {
+                    payload_.number.~Number();
                     break;
                 }
                 case Tag::String: {
@@ -325,32 +440,24 @@ class Dynamic {
         }
 
        public:
-        Payload payload_{};
         Tag tag_ = Tag::Invalid;
+        Payload payload_{};
     };
 
    public:
-    Dynamic() {}
+    BasicDynamic() {}
 
     template <class Type, class... Args>
-    static Dynamic From(Args&&... args) {
-        Dynamic dynamic;
+    static BasicDynamic From(Args&&... args) {
+        BasicDynamic dynamic;
         dynamic.Emplace<Type>(std::forward<Args>(args)...);
         return dynamic;
     }
 
     template <class Type, class... Args>
     void Emplace(Args&&... args) {
-        impl_.Emplace<Type>(std::forward<Args>(args)...);
+        impl_.template Emplace<Type>(std::forward<Args>(args)...);
     }
-
-    Null null;
-    Integer integer;
-    Number number;
-    String string;
-    Array array;
-    Object object;
-    Invalid invalid = {};
 
     DCONSTEXPR_14 Integer GetInteger() const { return impl_.GetInteger(); }
 
@@ -367,6 +474,37 @@ class Dynamic {
 
     DCONSTEXPR_14 Null GetNull() const { return impl_.GetNull(); }
 
+    template <class CastType>
+    CastType& As() {
+        return impl_.template As<CastType>();
+    }
+
+    template <class CastType>
+    const CastType& As() const {
+        return impl_.template As<CastType>();
+    }
+
+    template <class CastType>
+    operator CastType&() {
+        return As<CastType>();
+    }
+
+    template <class CastType>
+    operator const CastType&() const {
+        return As<CastType>();
+    }
+
+    template <class CastType>
+    operator CastType() const {
+        return As<CastType>();
+    }
+
+    template <class Type>
+    BasicDynamic& operator=(const Type& value) {
+        Emplace<typename BestFitFor<Type>::type>(value);
+        return *this;
+    }
+
    private:
     [[noreturn]]
     static void InvalidAccess() {
@@ -376,6 +514,9 @@ class Dynamic {
    private:
     Impl impl_;
 };
+
+using Dynamic = BasicDynamic<std::int64_t, double, std::string, std::vector,
+                             std::unordered_map>;
 
 }  // namespace dynamicxx
 
