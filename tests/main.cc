@@ -13,4 +13,12 @@ TEST(DynamicTest, BasicDynamicText) {
     EXPECT_EQ(d.GetString(), s);
 }
 
-TEST(DynamicTest, BasicTest) {}
+TEST(DynamicTest, BasicTest) {
+    static constexpr auto FooBarKey = "Foobar";
+
+    Dynamic d = Dynamic::From<Dynamic::Object>();
+    d[FooBarKey] = 42;
+
+    EXPECT_TRUE(d.Contains(FooBarKey));
+    EXPECT_EQ(d[FooBarKey], 42);
+}
