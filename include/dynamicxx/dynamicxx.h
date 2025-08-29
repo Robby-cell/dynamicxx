@@ -63,6 +63,7 @@ class InvalidAccessException : std::runtime_error {
 
 template <class IntegerType, class NumberType, class StringType,
           template <class...> class ArrayContainerType,
+          template <class...> class BlobContainerType,
           template <class...> class ObjectContainerType>
 class BasicDynamic {
    public:
@@ -72,6 +73,7 @@ class BasicDynamic {
     using Number = NumberType;
     using String = StringType;
     using Array = ArrayContainerType<BasicDynamic>;
+    using Blob = BlobContainerType<std::uint8_t>;
     using Object = ObjectContainerType<std::string, BasicDynamic>;
     struct Undefined {};
 
@@ -94,6 +96,8 @@ class BasicDynamic {
     template <>
     struct BestFitFor<Array> : detail::TypeIdentity<Array> {};
     template <>
+    struct BestFitFor<Blob> : detail::TypeIdentity<Blob> {};
+    template <>
     struct BestFitFor<Object> : detail::TypeIdentity<Object> {};
 
     template <class Type>
@@ -109,9 +113,13 @@ class BasicDynamic {
                           typename std::conditional<
                               std::is_constructible<Array, Type>::value, Array,
                               typename std::conditional<
-                                  std::is_constructible<Object, Type>::value,
-                                  Object, void>::type>::type>::type>::type>::
-                  type>::type> {};
+                                  std::is_constructible<Blob, Type>::value,
+                                  Blob,
+                                  typename std::conditional<
+                                      std::is_constructible<Object,
+                                                            Type>::value,
+                                      Object, void>::type>::type>::type>::
+                          type>::type>::type>::type> {};
 
    private:
     using TagRepr = std::uint32_t;
@@ -122,6 +130,7 @@ class BasicDynamic {
         Number,
         String,
         Array,
+        Blob,
         Object,
         Undefined = ~static_cast<TagRepr>(0),
     };
@@ -145,6 +154,8 @@ class BasicDynamic {
     template <>
     struct TagOfHelper<Array> : TagIdentity<Tag::Array> {};
     template <>
+    struct TagOfHelper<Blob> : TagIdentity<Tag::Blob> {};
+    template <>
     struct TagOfHelper<Object> : TagIdentity<Tag::Object> {};
     template <>
     struct TagOfHelper<Undefined> : TagIdentity<Tag::Undefined> {};
@@ -164,6 +175,7 @@ class BasicDynamic {
         Number number;
         String string;
         Array array;
+        Blob blob;
         Object object;
         Undefined undefined = {};
     };
@@ -205,6 +217,9 @@ class BasicDynamic {
         }
         DNODISCARD constexpr bool HoldsArray() const noexcept {
             return Holds<Array>();
+        }
+        DNODISCARD constexpr bool HoldsBlob() const noexcept {
+            return Holds<Blob>();
         }
         DNODISCARD constexpr bool HoldsObject() const noexcept {
             return Holds<Object>();
@@ -267,6 +282,21 @@ class BasicDynamic {
                 UNLIKELY { InvalidAccess(); }
         }
 
+        DNODISCARD DCONSTEXPR_14 Blob& GetBlob() {
+            if (HoldsBlob()) LIKELY {
+                    return payload_.blob;
+                }
+            else
+                UNLIKELY { InvalidAccess(); }
+        }
+        DNODISCARD DCONSTEXPR_14 const Blob& GetBlob() const {
+            if (HoldsBlob()) LIKELY {
+                    return payload_.blob;
+                }
+            else
+                UNLIKELY { InvalidAccess(); }
+        }
+
         DNODISCARD DCONSTEXPR_14 Object& GetObject() {
             if (HoldsObject()) LIKELY {
                     return payload_.object;
@@ -315,6 +345,7 @@ class BasicDynamic {
         friend Caster<Number>;
         friend Caster<String>;
         friend Caster<Array>;
+        friend Caster<Blob>;
         friend Caster<Object>;
 
         template <>
@@ -360,6 +391,15 @@ class BasicDynamic {
             }
             DNODISCARD static const Array& As(const Impl& impl) {
                 return impl.payload_.array;
+            }
+        };
+        template <>
+        struct Caster<Blob> {
+            DNODISCARD static Blob& As(Impl& impl) {
+                return impl.payload_.blob;
+            }
+            DNODISCARD static const Blob& As(const Impl& impl) {
+                return impl.payload_.blob;
             }
         };
         template <>
@@ -419,6 +459,9 @@ class BasicDynamic {
                 case Tag::Array: {
                     return payload_.array == that.payload_.array;
                 }
+                case Tag::Blob: {
+                    return payload_.blob == that.payload_.blob;
+                }
                 case Tag::Object: {
                     return payload_.object == that.payload_.object;
                 }
@@ -465,6 +508,10 @@ class BasicDynamic {
                     EmplaceRaw<Array>(std::move(that.payload_.array));
                     break;
                 }
+                case Tag::Blob: {
+                    EmplaceRaw<Blob>(std::move(that.payload_.blob));
+                    break;
+                }
                 case Tag::Object: {
                     EmplaceRaw<Object>(std::move(that.payload_.object));
                     break;
@@ -500,6 +547,10 @@ class BasicDynamic {
                 }
                 case Tag::Array: {
                     EmplaceRaw<Array>(that.payload_.array);
+                    break;
+                }
+                case Tag::Blob: {
+                    EmplaceRaw<Blob>(that.payload_.blob);
                     break;
                 }
                 case Tag::Object: {
@@ -538,6 +589,10 @@ class BasicDynamic {
                 }
                 case Tag::Array: {
                     payload_.array.~Array();
+                    break;
+                }
+                case Tag::Blob: {
+                    payload_.blob.~Blob();
                     break;
                 }
                 case Tag::Object: {
@@ -601,6 +656,9 @@ class BasicDynamic {
     DNODISCARD constexpr bool IsArray() const noexcept {
         return impl_.HoldsArray();
     }
+    DNODISCARD constexpr bool IsBlob() const noexcept {
+        return impl_.HoldsBlob();
+    }
     DNODISCARD constexpr bool IsObject() const noexcept {
         return impl_.HoldsObject();
     }
@@ -630,6 +688,11 @@ class BasicDynamic {
     DNODISCARD DCONSTEXPR_14 Array& GetArray() { return impl_.GetArray(); }
     DNODISCARD DCONSTEXPR_14 const Array& GetArray() const {
         return impl_.GetArray();
+    }
+
+    DNODISCARD DCONSTEXPR_14 Blob& GetBlob() { return impl_.GetBlob(); }
+    DNODISCARD DCONSTEXPR_14 const Blob& GetBlob() const {
+        return impl_.GetBlob();
     }
 
     DNODISCARD DCONSTEXPR_14 Object& GetObject() { return impl_.GetObject(); }
@@ -791,7 +854,7 @@ class BasicDynamic {
 };
 
 using Dynamic = BasicDynamic<std::int64_t, double, std::string, std::vector,
-                             std::unordered_map>;
+                             std::vector, std::unordered_map>;
 
 }  // namespace dynamicxx
 
