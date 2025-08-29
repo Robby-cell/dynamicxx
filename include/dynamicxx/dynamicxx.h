@@ -54,6 +54,10 @@ struct TypeIdentity {
     using type = Type;  // NOLINT
 };
 
+struct Null {};
+
+struct Undefined {};
+
 }  // namespace detail
 
 class InvalidAccessException : std::runtime_error {
@@ -67,7 +71,7 @@ template <class IntegerType, class NumberType, class StringType,
           template <class...> class ObjectContainerType>
 class BasicDynamic {
    public:
-    struct Null {};
+    using Null = detail::Null;
     using Boolean = bool;
     using Integer = IntegerType;
     using Number = NumberType;
@@ -75,7 +79,7 @@ class BasicDynamic {
     using Array = ArrayContainerType<BasicDynamic>;
     using Blob = BlobContainerType<std::uint8_t>;
     using Object = ObjectContainerType<std::string, BasicDynamic>;
-    struct Undefined {};
+    using Undefined = detail::Undefined;
 
     static_assert(std::is_integral<Integer>::value,
                   "Integer type provided must be an integral type");
