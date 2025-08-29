@@ -66,6 +66,7 @@ template <class IntegerType, class NumberType, class StringType,
 class BasicDynamic {
    public:
     struct Null {};
+    using Boolean = bool;
     using Integer = IntegerType;
     using Number = NumberType;
     using String = StringType;
@@ -95,22 +96,25 @@ class BasicDynamic {
     template <class Type>
     struct BestFitFor
         : BestFitFor<typename std::conditional<
-              std::is_integral<Type>::value, Integer,
+              std::is_same<bool, Type>::value, bool,
               typename std::conditional<
-                  std::is_floating_point<Type>::value, Number,
+                  std::is_integral<Type>::value, Integer,
                   typename std::conditional<
-                      std::is_constructible<String, Type>::value, String,
+                      std::is_floating_point<Type>::value, Number,
                       typename std::conditional<
-                          std::is_constructible<Array, Type>::value, Array,
+                          std::is_constructible<String, Type>::value, String,
                           typename std::conditional<
-                              std::is_constructible<Object, Type>::value,
-                              Object, void>::type>::type>::type>::type>::type> {
-    };
+                              std::is_constructible<Array, Type>::value, Array,
+                              typename std::conditional<
+                                  std::is_constructible<Object, Type>::value,
+                                  Object, void>::type>::type>::type>::type>::
+                  type>::type> {};
 
    private:
     using TagRepr = std::uint32_t;
     enum struct Tag : TagRepr {
         Null = 0,
+        Boolean,
         Integer,
         Number,
         String,
@@ -127,6 +131,8 @@ class BasicDynamic {
 
     template <>
     struct TagOfHelper<Null> : TagIdentity<Tag::Null> {};
+    template <>
+    struct TagOfHelper<Boolean> : TagIdentity<Tag::Boolean> {};
     template <>
     struct TagOfHelper<Integer> : TagIdentity<Tag::Integer> {};
     template <>
@@ -148,6 +154,7 @@ class BasicDynamic {
         ~Payload() {}
 
         Null null;
+        Boolean boolean;
         Integer integer;
         Number number;
         String string;
@@ -176,6 +183,9 @@ class BasicDynamic {
             return *this;
         }
 
+        DNODISCARD constexpr bool HoldsBoolean() const noexcept {
+            return Holds<Boolean>();
+        }
         DNODISCARD constexpr bool HoldsInteger() const noexcept {
             return Holds<Integer>();
         }
@@ -193,6 +203,14 @@ class BasicDynamic {
         }
         DNODISCARD constexpr bool HoldsNull() const noexcept {
             return Holds<Null>();
+        }
+
+        DNODISCARD DCONSTEXPR_14 Boolean GetBoolean() const {
+            if (HoldsBoolean()) LIKELY {
+                    return payload_.boolean;
+                }
+            else
+                UNLIKELY { InvalidAccess(); }
         }
 
         DNODISCARD DCONSTEXPR_14 Integer GetInteger() const {
@@ -284,12 +302,22 @@ class BasicDynamic {
         template <class CastType>
         struct Caster;
 
+        friend Caster<Boolean>;
         friend Caster<Integer>;
         friend Caster<Number>;
         friend Caster<String>;
         friend Caster<Array>;
         friend Caster<Object>;
 
+        template <>
+        struct Caster<Boolean> {
+            DNODISCARD static Boolean& As(Impl& impl) {
+                return impl.payload_.boolean;
+            }
+            DNODISCARD static const Boolean& As(const Impl& impl) {
+                return impl.payload_.boolean;
+            }
+        };
         template <>
         struct Caster<Integer> {
             DNODISCARD static Integer& As(Impl& impl) {
@@ -336,6 +364,13 @@ class BasicDynamic {
             }
         };
 
+        template <>
+        struct Caster<Null> {
+            DNODISCARD static Null As(const Impl& impl) {
+                return impl.payload_.null;
+            }
+        };
+
        public:
         template <class CastType>
         DNODISCARD CastType& As() {
@@ -360,6 +395,9 @@ class BasicDynamic {
             switch (tag_) {
                 case Tag::Null: {
                     return true;
+                }
+                case Tag::Boolean: {
+                    return payload_.boolean == that.payload_.boolean;
                 }
                 case Tag::Integer: {
                     return payload_.integer == that.payload_.integer;
@@ -394,7 +432,13 @@ class BasicDynamic {
         void MoveRaw(Impl& that) noexcept {
             tag_ = that.tag_;
             switch (that.tag_) {
-                case Tag::Null:
+                case Tag::Null: {
+                    break;
+                }
+                case Tag::Boolean: {
+                    EmplaceRaw<Boolean>(std::move(that.payload_.boolean));
+                    break;
+                }
                 case Tag::Integer: {
                     EmplaceRaw<Integer>(std::move(that.payload_.integer));
                     break;
@@ -429,6 +473,9 @@ class BasicDynamic {
             tag_ = that.tag_;
             switch (that.tag_) {
                 case Tag::Null:
+                case Tag::Boolean: {
+                    EmplaceRaw<Boolean>(that.payload_.boolean);
+                }
                 case Tag::Integer: {
                     EmplaceRaw<Integer>(that.payload_.integer);
                     break;
@@ -523,6 +570,9 @@ class BasicDynamic {
         impl_.template Emplace<Type>(std::forward<Args>(args)...);
     }
 
+    DNODISCARD constexpr bool IsBoolean() const noexcept {
+        return impl_.HoldsBool();
+    }
     DNODISCARD constexpr bool IsInteger() const noexcept {
         return impl_.HoldsInteger();
     }
@@ -537,6 +587,10 @@ class BasicDynamic {
     }
     DNODISCARD constexpr bool IsObject() const noexcept {
         return impl_.HoldsObject();
+    }
+
+    DNODISCARD DCONSTEXPR_14 Boolean GetBoolean() const {
+        return impl_.GetBoolean();
     }
 
     DNODISCARD DCONSTEXPR_14 Integer GetInteger() const {
@@ -626,7 +680,12 @@ class BasicDynamic {
     }
 
     template <class Key>
-    DNODISCARD const BasicDynamic& operator[](const Key& key) const {
+    DNODISCARD BasicDynamic& At(const Key& key) {
+        return As<Object>().at(key);
+    }
+
+    template <class Key>
+    DNODISCARD const BasicDynamic& At(const Key& key) const {
         return As<Object>().at(key);
     }
 
