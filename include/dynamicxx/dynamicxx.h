@@ -542,6 +542,61 @@ class BasicDynamic {
             }
         }
 
+        DNODISCARD Impl Clone() const {
+            Impl impl;
+            switch (tag_) {
+                case Tag::Null: {
+                    impl.EmplaceRaw<Null>(payload_.null);
+                    return impl;
+                }
+                case Tag::Boolean: {
+                    impl.EmplaceRaw<Boolean>(payload_.boolean);
+                    return impl;
+                }
+                case Tag::Integer: {
+                    impl.EmplaceRaw<Integer>(payload_.integer);
+                    return impl;
+                }
+                case Tag::Number: {
+                    impl.EmplaceRaw<Number>(payload_.number);
+                    return impl;
+                }
+                case Tag::String: {
+                    impl.EmplaceRaw<String>(payload_.string);
+                    return impl;
+                }
+                case Tag::Blob: {
+                    impl.EmplaceRaw<Blob>(payload_.blob);
+                    return impl;
+                }
+                case Tag::Array: {
+                    impl.EmplaceRaw<Array>();
+                    auto& array = impl.As<Array>();
+                    array.reserve(payload_.array.size());
+                    for (const auto& value : payload_.array) {
+                        array.emplace_back(value.Clone());
+                    }
+                    return impl;
+                }
+                case Tag::Object: {
+                    impl.EmplaceRaw<Object>();
+                    auto& object = impl.As<Object>();
+                    object.reserve(payload_.object.size());
+                    for (const auto& value : payload_.object) {
+                        object[value.first] = value.second.Clone();
+                    }
+                    return impl;
+                }
+                case Tag::Undefined: {
+                    impl.EmplaceRaw<Undefined>(payload_.undefined);
+                    return impl;
+                }
+
+                default:
+                    ThrowInvalidTerminatingTag();
+            }
+        }
+
         DNODISCARD DCONSTEXPR_14 bool Equals(const Impl& that) const {
             DDO_ASSERT(tag_ == that.tag_);
             switch (tag_) {
@@ -731,8 +786,11 @@ class BasicDynamic {
         friend BasicDynamic;
     };
 
+   protected:
+    BasicDynamic(ImplWrapper<Impl> impl) : impl_(std::move(impl)) {}
+
    public:
-    BasicDynamic() : impl_(detail::DefaultOf<ImplWrapper<Impl>>()) {}
+    BasicDynamic() : BasicDynamic(detail::DefaultOf<ImplWrapper<Impl>>()) {}
 
     template <class Type, class... Args>
     DNODISCARD static BasicDynamic From(Args&&... args) {
@@ -843,6 +901,11 @@ class BasicDynamic {
         return As<CastType>();
     }
 
+    DNODISCARD BasicDynamic Clone() const {
+        return BasicDynamic{
+            detail::DefaultFactory<ImplWrapper<Impl>>{}(GetImpl().Clone())};
+    }
+
     DNODISCARD DCONSTEXPR_14 bool Equals(
         const BasicDynamic& rhs) const noexcept {
         if (GetImpl().tag_ != rhs.GetImpl().tag_) {
@@ -861,10 +924,19 @@ class BasicDynamic {
         return As<CastType>() == that;
     }
 
+    DNODISCARD friend DCONSTEXPR_14 bool operator==(
+        const BasicDynamic& lhs, const BasicDynamic& rhs) noexcept {
+        return lhs.Equals(rhs);
+    }
     template <class Type>
     DNODISCARD friend DCONSTEXPR_14 bool operator==(const BasicDynamic& lhs,
-                                                    Type&& rhs) noexcept {
+                                                    const Type& rhs) noexcept {
         return lhs.Equals(rhs);
+    }
+    template <class Type>
+    DNODISCARD friend DCONSTEXPR_14 bool operator==(
+        const Type& lhs, const BasicDynamic& rhs) noexcept {
+        return rhs == lhs;
     }
 
     template <class Type>
