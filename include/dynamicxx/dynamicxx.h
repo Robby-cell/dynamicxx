@@ -60,6 +60,49 @@ struct Undefined {};
 
 }  // namespace detail
 
+struct DefaultToIndex {
+    template <class Type>
+    std::size_t Convert(Type value) const noexcept {
+        return static_cast<std::size_t>(value);
+    }
+
+    std::size_t Convert(const char* str) const noexcept {
+        return std::stoul(str);
+    }
+
+    std::size_t Convert(const std::string& str) const noexcept {
+        return std::stoul(str);
+    }
+};
+
+template <class String>
+struct IntStringifier;
+
+template <>
+struct IntStringifier<std::string> {
+    template <class Type>
+    std::string Convert(Type value) const {
+        return std::to_string(value);
+    }
+};
+
+struct DefaultToString {
+    template <class String, class Type>
+    String Convert(Type value) const {
+        return IntStringifier<String>{}.Convert(value);
+    }
+
+    template <class String>
+    const String& Convert(const String& str) const {
+        return str;
+    }
+
+    template <class String>
+    const char* Convert(const char* str) const {
+        return str;
+    }
+};
+
 class InvalidAccessException : std::runtime_error {
    public:
     using std::runtime_error::runtime_error;
@@ -68,7 +111,8 @@ class InvalidAccessException : std::runtime_error {
 template <class IntegerType, class NumberType, class StringType,
           template <class...> class ArrayContainerType,
           template <class...> class BlobContainerType,
-          template <class...> class ObjectContainerType>
+          template <class...> class ObjectContainerType,
+          class ToString = DefaultToString, class ToIndex = DefaultToIndex>
 class BasicDynamic {
    public:
     using Null = detail::Null;
@@ -766,8 +810,28 @@ class BasicDynamic {
     }
 
     template <class Key>
-    DNODISCARD BasicDynamic& operator[](const Key& key) {
-        return As<Object>()[key];
+    DNODISCARD BasicDynamic& operator[](const Key& k) {
+        if (IsArray()) {
+            decltype(auto) index = ToIndex{}.Convert(k);
+            return AtIndex(index);
+        } else if (IsObject()) {
+            decltype(auto) key = ToString{}.template Convert<std::string>(k);
+            return AtKey(key);
+        } else {
+            InvalidAccess();
+        }
+    }
+    template <class Key>
+    DNODISCARD const BasicDynamic& operator[](const Key& k) const {
+        if (IsArray()) {
+            decltype(auto) index = ToIndex{}.Convert(k);
+            return AtIndex(index);
+        } else if (IsObject()) {
+            decltype(auto) key = ToString{}.template Convert<std::string>(k);
+            return AtKey(key);
+        } else {
+            InvalidAccess();
+        }
     }
 
     template <class Key>
@@ -780,49 +844,22 @@ class BasicDynamic {
         return As<Object>().at(key);
     }
 
+   private:
+    template <class Key>
+    DNODISCARD BasicDynamic& AtKey(const Key& key) {
+        return As<Object>()[key];
+    }
+    template <class Key>
+    DNODISCARD const BasicDynamic& AtKey(const Key& key) const {
+        return As<Object>().at(key);
+    }
+
+   public:
     DNODISCARD BasicDynamic& AtIndex(const std::size_t index) {
         return As<Array>().at(index);
     }
     DNODISCARD const BasicDynamic& AtIndex(const std::size_t index) const {
         return As<Array>().at(index);
-    }
-
-    DNODISCARD BasicDynamic& operator[](const std::size_t index) {
-        return AtIndex(index);
-    }
-    DNODISCARD const BasicDynamic& operator[](const std::size_t index) const {
-        return AtIndex(index);
-    }
-    DNODISCARD BasicDynamic& operator[](const std::ptrdiff_t index) {
-        return AtIndex(index);
-    }
-    DNODISCARD const BasicDynamic& operator[](
-        const std::ptrdiff_t index) const {
-        return AtIndex(index);
-    }
-    DNODISCARD BasicDynamic& operator[](const std::uint32_t index) {
-        return AtIndex(index);
-    }
-    DNODISCARD const BasicDynamic& operator[](const std::uint32_t index) const {
-        return AtIndex(index);
-    }
-    DNODISCARD BasicDynamic& operator[](const std::int32_t index) {
-        return AtIndex(index);
-    }
-    DNODISCARD const BasicDynamic& operator[](const std::int32_t index) const {
-        return AtIndex(index);
-    }
-    DNODISCARD BasicDynamic& operator[](const std::uint16_t index) {
-        return AtIndex(index);
-    }
-    DNODISCARD const BasicDynamic& operator[](const std::uint16_t index) const {
-        return AtIndex(index);
-    }
-    DNODISCARD BasicDynamic& operator[](const std::int16_t index) {
-        return AtIndex(index);
-    }
-    DNODISCARD const BasicDynamic& operator[](const std::int16_t index) const {
-        return AtIndex(index);
     }
 
     template <class Type>
