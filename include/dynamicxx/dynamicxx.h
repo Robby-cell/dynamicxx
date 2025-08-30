@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -57,6 +58,23 @@ struct TypeIdentity {
 struct Null {};
 
 struct Undefined {};
+
+template <class Type>
+using NonNull = Type;
+
+template <class Type>
+auto PointerOf(Type& value) -> Type* {
+    return std::addressof(value);
+}
+
+template <class Type>
+auto PointerOf(std::shared_ptr<Type>& ptr) -> decltype(ptr.get()) {
+    return ptr.get();
+}
+template <class Type>
+auto PointerOf(const std::shared_ptr<Type>& ptr) -> decltype(ptr.get()) {
+    return ptr.get();
+}
 
 }  // namespace detail
 
@@ -124,7 +142,8 @@ template <class IntegerType = DefaultInteger, class NumberType = DefaultNumber,
           template <class...> class ArrayContainerType = DefaultArrayContainer,
           template <class...> class ObjectContainerType =
               DefaultObjectContainer,
-          class ToString = DefaultToString, class ToIndex = DefaultToIndex>
+          class ToString = DefaultToString, class ToIndex = DefaultToIndex,
+          template <class...> class ImplWrapper = detail::NonNull>
 class BasicDynamic {
    public:
     using Null = detail::Null;
@@ -699,83 +718,89 @@ class BasicDynamic {
 
     template <class Type, class... Args>
     void Emplace(Args&&... args) {
-        impl_.template Emplace<Type>(std::forward<Args>(args)...);
+        GetImpl().template Emplace<Type>(std::forward<Args>(args)...);
     }
 
     DNODISCARD constexpr bool IsNull() const noexcept {
-        return impl_.HoldsNull();
+        return GetImpl().HoldsNull();
     }
     DNODISCARD constexpr bool IsBoolean() const noexcept {
-        return impl_.HoldsBool();
+        return GetImpl().HoldsBool();
     }
     DNODISCARD constexpr bool IsInteger() const noexcept {
-        return impl_.HoldsInteger();
+        return GetImpl().HoldsInteger();
     }
     DNODISCARD constexpr bool IsNumber() const noexcept {
-        return impl_.HoldsNumber();
+        return GetImpl().HoldsNumber();
     }
     DNODISCARD constexpr bool IsString() const noexcept {
-        return impl_.HoldsString();
+        return GetImpl().HoldsString();
     }
     DNODISCARD constexpr bool IsBlob() const noexcept {
-        return impl_.HoldsBlob();
+        return GetImpl().HoldsBlob();
     }
     DNODISCARD constexpr bool IsArray() const noexcept {
-        return impl_.HoldsArray();
+        return GetImpl().HoldsArray();
     }
     DNODISCARD constexpr bool IsObject() const noexcept {
-        return impl_.HoldsObject();
+        return GetImpl().HoldsObject();
     }
     DNODISCARD constexpr bool IsUndefined() const noexcept {
-        return impl_.HoldsUndefined();
+        return GetImpl().HoldsUndefined();
     }
 
-    DNODISCARD DCONSTEXPR_14 Null GetNull() const { return impl_.GetNull(); }
+    DNODISCARD DCONSTEXPR_14 Null GetNull() const {
+        return GetImpl().GetNull();
+    }
 
     DNODISCARD DCONSTEXPR_14 Boolean GetBoolean() const {
-        return impl_.GetBoolean();
+        return GetImpl().GetBoolean();
     }
 
     DNODISCARD DCONSTEXPR_14 Integer GetInteger() const {
-        return impl_.GetInteger();
+        return GetImpl().GetInteger();
     }
 
     DNODISCARD DCONSTEXPR_14 Number GetNumber() const {
-        return impl_.GetNumber();
+        return GetImpl().GetNumber();
     }
 
-    DNODISCARD DCONSTEXPR_14 String& GetString() { return impl_.GetString(); }
+    DNODISCARD DCONSTEXPR_14 String& GetString() {
+        return GetImpl().GetString();
+    }
     DNODISCARD DCONSTEXPR_14 const String& GetString() const {
-        return impl_.GetString();
+        return GetImpl().GetString();
     }
 
-    DNODISCARD DCONSTEXPR_14 Blob& GetBlob() { return impl_.GetBlob(); }
+    DNODISCARD DCONSTEXPR_14 Blob& GetBlob() { return GetImpl().GetBlob(); }
     DNODISCARD DCONSTEXPR_14 const Blob& GetBlob() const {
-        return impl_.GetBlob();
+        return GetImpl().GetBlob();
     }
 
-    DNODISCARD DCONSTEXPR_14 Array& GetArray() { return impl_.GetArray(); }
+    DNODISCARD DCONSTEXPR_14 Array& GetArray() { return GetImpl().GetArray(); }
     DNODISCARD DCONSTEXPR_14 const Array& GetArray() const {
-        return impl_.GetArray();
+        return GetImpl().GetArray();
     }
 
-    DNODISCARD DCONSTEXPR_14 Object& GetObject() { return impl_.GetObject(); }
+    DNODISCARD DCONSTEXPR_14 Object& GetObject() {
+        return GetImpl().GetObject();
+    }
     DNODISCARD DCONSTEXPR_14 const Object& GetObject() const {
-        return impl_.GetObject();
+        return GetImpl().GetObject();
     }
 
     DNODISCARD DCONSTEXPR_14 Undefined GetUndefined() const {
-        return impl_.GetUndefined();
+        return GetImpl().GetUndefined();
     }
 
     template <class CastType>
     DNODISCARD CastType& As() {
-        return impl_.template As<CastType>();
+        return GetImpl().template As<CastType>();
     }
 
     template <class CastType>
     DNODISCARD const CastType& As() const {
-        return impl_.template As<CastType>();
+        return GetImpl().template As<CastType>();
     }
 
     template <class CastType>
@@ -795,17 +820,17 @@ class BasicDynamic {
 
     DNODISCARD DCONSTEXPR_14 bool Equals(
         const BasicDynamic& rhs) const noexcept {
-        if (impl_.tag_ != rhs.impl_.tag_) {
+        if (GetImpl().tag_ != rhs.GetImpl().tag_) {
             return false;
         }
-        return impl_.Equals(rhs.impl_);
+        return GetImpl().Equals(rhs.GetImpl());
     }
 
     template <class Type>
     DNODISCARD DCONSTEXPR_14 bool Equals(const Type& that) const noexcept {
         using CastType = typename BestFitFor<typename std::remove_cv<
             typename std::remove_reference<Type>::type>::type>::type;
-        if (!impl_.template Holds<CastType>()) {
+        if (!GetImpl().template Holds<CastType>()) {
             return false;
         }
         return As<CastType>() == that;
@@ -906,14 +931,26 @@ class BasicDynamic {
         throw InvalidAccessException("Invalid access attempted");
     }
 
+    auto GetImpl() noexcept -> Impl& { return *detail::PointerOf(impl_); }
+
+    auto GetImpl() const noexcept -> const Impl& {
+        return *detail::PointerOf(impl_);
+    }
+
    private:
-    Impl impl_;
+    ImplWrapper<Impl> impl_;
 };
 
-using Dynamic =
+using Dynamic = BasicDynamic<DefaultInteger, DefaultNumber, DefaultString,
+                             DefaultBlobContainer, DefaultArrayContainer,
+                             DefaultObjectContainer, DefaultToString,
+                             DefaultToIndex, detail::NonNull>;
+
+using DynamicManaged =
     BasicDynamic<DefaultInteger, DefaultNumber, DefaultString,
                  DefaultBlobContainer, DefaultArrayContainer,
-                 DefaultObjectContainer, DefaultToString, DefaultToIndex>;
+                 DefaultObjectContainer, DefaultToString, DefaultToIndex,
+                 std::shared_ptr>;
 
 }  // namespace dynamicxx
 
