@@ -1,9 +1,11 @@
 #include <dynamicxx/dynamicxx.h>
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
 
 using dynamicxx::Dynamic;
+using dynamicxx::DynamicManaged;
 
 TEST(DynamicTest, BasicDynamicText) {
     static constexpr auto StringToUse = "Foobar";
@@ -50,4 +52,35 @@ TEST(DynamicTest, CopyConstructionAndAssignment) {
 
     const auto another_copy = d;
     ASSERT_EQ(d, another_copy);  // They should be deeply equal
+}
+
+TEST(DynamicTest, ManagedVersion) {
+    static constexpr std::array Values{1, 2, 42};
+
+    DynamicManaged managed;
+    managed.Emplace<DynamicManaged::Array>();
+
+    for (const auto& v : Values) {
+        managed.Push(v);
+    }
+
+    ASSERT_EQ(managed.GetArray().size(), Values.size());
+    {
+        for (std::size_t i = 0; i < Values.size(); ++i) {
+            ASSERT_EQ(Values[i], managed[i]);
+        }
+    }
+}
+
+TEST(DynamicTest, ManagedDeepClone) {
+    static constexpr auto FooBarKey = "FooBar";
+
+    DynamicManaged d;
+    d.Emplace<DynamicManaged::Object>();
+
+    d[FooBarKey] = 42;
+
+    auto clone = d.Clone();
+
+    ASSERT_EQ(d[FooBarKey], clone[FooBarKey]);
 }
