@@ -79,6 +79,28 @@ auto PointerOf(const std::shared_ptr<Type>& ptr) -> NonNull<const Type*> {
     return ptr.get();
 }
 
+template <class Type>
+struct DefaultFactory {
+    template <class... Args>
+    Type operator()(Args&&... args) const
+        noexcept(noexcept(Type{std::forward<Args>(args)...})) {
+        return Type{std::forward<Args>(args)...};
+    }
+};
+template <class Type>
+struct DefaultFactory<std::shared_ptr<Type>> {
+    template <class... Args>
+    std::shared_ptr<Type> operator()(Args&&... args) const noexcept(
+        noexcept(std::make_shared<Type>(std::forward<Args>(args)...))) {
+        return std::make_shared<Type>(std::forward<Args>(args)...);
+    }
+};
+
+template <class Type>
+Type DefaultOf() noexcept(noexcept(DefaultFactory<Type>{}())) {
+    return DefaultFactory<Type>{}();
+}
+
 }  // namespace detail
 
 struct DefaultToIndex {
@@ -710,7 +732,7 @@ class BasicDynamic {
     };
 
    public:
-    BasicDynamic() {}
+    BasicDynamic() : impl_(detail::DefaultOf<ImplWrapper<Impl>>()) {}
 
     template <class Type, class... Args>
     DNODISCARD static BasicDynamic From(Args&&... args) {
