@@ -60,19 +60,22 @@ struct Null {};
 struct Undefined {};
 
 template <class Type>
+using Just = Type;
+
+template <class Type>
 using NonNull = Type;
 
 template <class Type>
-auto PointerOf(Type& value) -> Type* {
+auto PointerOf(Type& value) -> NonNull<Type*> {
     return std::addressof(value);
 }
 
 template <class Type>
-auto PointerOf(std::shared_ptr<Type>& ptr) -> decltype(ptr.get()) {
+auto PointerOf(std::shared_ptr<Type>& ptr) -> NonNull<Type*> {
     return ptr.get();
 }
 template <class Type>
-auto PointerOf(const std::shared_ptr<Type>& ptr) -> decltype(ptr.get()) {
+auto PointerOf(const std::shared_ptr<Type>& ptr) -> NonNull<const Type*> {
     return ptr.get();
 }
 
@@ -143,7 +146,7 @@ template <class IntegerType = DefaultInteger, class NumberType = DefaultNumber,
           template <class...> class ObjectContainerType =
               DefaultObjectContainer,
           class ToString = DefaultToString, class ToIndex = DefaultToIndex,
-          template <class...> class ImplWrapper = detail::NonNull>
+          template <class...> class ImplWrapper = detail::Just>
 class BasicDynamic {
    public:
     using Null = detail::Null;
@@ -944,7 +947,7 @@ class BasicDynamic {
 using Dynamic = BasicDynamic<DefaultInteger, DefaultNumber, DefaultString,
                              DefaultBlobContainer, DefaultArrayContainer,
                              DefaultObjectContainer, DefaultToString,
-                             DefaultToIndex, detail::NonNull>;
+                             DefaultToIndex, detail::Just>;
 
 using DynamicManaged =
     BasicDynamic<DefaultInteger, DefaultNumber, DefaultString,
