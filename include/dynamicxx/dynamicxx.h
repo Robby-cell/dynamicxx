@@ -55,6 +55,15 @@ struct TypeIdentity {
     using type = Type;  // NOLINT
 };
 
+template <class Type>
+struct IsBool {
+    static constexpr bool value = false;
+};
+template <>
+struct IsBool<bool> {
+    static constexpr bool value = true;
+};
+
 struct Null {};
 
 struct Undefined {};
@@ -186,7 +195,7 @@ class BasicDynamic {
     static_assert(std::is_floating_point<Number>::value,
                   "Number type provided must be a floating point type");
 
-    template <class Type>
+    template <class... Args>
     struct BestFitFor;
 
     template <>
@@ -205,25 +214,37 @@ class BasicDynamic {
     struct BestFitFor<Object> : detail::TypeIdentity<Object> {};
 
     template <class Type>
+    struct BestFitFor<Type>
+        : detail::TypeIdentity<typename std::conditional_t<
+              detail::IsBool<Type>::value, Boolean,
+              std::conditional_t<
+                  std::is_integral_v<Type>, Integer,
+                  std::conditional_t<
+                      std::is_floating_point_v<Type>, Number,
+                      std::conditional_t<
+                          std::is_constructible_v<String, Type>, String,
+                          std::conditional_t<
+                              std::is_constructible_v<Blob, Type>, Blob,
+                              std::conditional_t<
+                                  std::is_constructible_v<Array, Type>, Array,
+                                  std::conditional_t<
+                                      std::is_constructible_v<Object, Type>,
+                                      Object,
+                                      void  // Fallback if no type matches
+                                      >>>>>>>> {};
+
+    template <class... Args>
     struct BestFitFor
-        : BestFitFor<typename std::conditional<
-              std::is_same<bool, Type>::value, Boolean,
-              typename std::conditional<
-                  std::is_integral<Type>::value, Integer,
-                  typename std::conditional<
-                      std::is_floating_point<Type>::value, Number,
-                      typename std::conditional<
-                          std::is_constructible<String, Type>::value, String,
-                          typename std::conditional<
-                              std::is_constructible<Blob, Type>::value, Blob,
-                              typename std::conditional<
-                                  std::is_constructible<Array, Type>::value,
-                                  Array,
-                                  typename std::conditional<
-                                      std::is_constructible<Object,
-                                                            Type>::value,
-                                      Object, void>::type>::type>::type>::
-                          type>::type>::type>::type> {};
+        : detail::TypeIdentity<typename std::conditional_t<
+              // Check for multi-arg constructors in a reasonable priority order
+              std::is_constructible_v<String, Args...>, String,
+              std::conditional_t<
+                  std::is_constructible_v<Array, Args...>, Array,
+                  std::conditional_t<
+                      std::is_constructible_v<Object, Args...>, Object,
+                      // Add other multi-arg constructible types here if needed
+                      void  // Fallback if no type has a matching constructor
+                      >>>> {};
 
    private:
     using TagRepr = std::uint32_t;
