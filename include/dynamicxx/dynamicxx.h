@@ -215,38 +215,35 @@ class BasicDynamic {
 
     template <class Type>
     struct BestFitFor<Type>
-        : detail::TypeIdentity<typename std::conditional_t<
+        : detail::TypeIdentity<typename std::conditional<
               detail::IsBool<Type>::value, Boolean,
-              std::conditional_t<
+              typename std::conditional<
                   std::is_integral<Type>::value, Integer,
-                  std::conditional_t<
+                  typename std::conditional<
                       std::is_floating_point<Type>::value, Number,
-                      std::conditional_t<
+                      typename std::conditional<
                           std::is_constructible<String, Type>::value, String,
-                          std::conditional_t<
+                          typename std::conditional<
                               std::is_constructible<Blob, Type>::value, Blob,
-                              std::conditional_t<
+                              typename std::conditional<
                                   std::is_constructible<Array, Type>::value,
                                   Array,
-                                  std::conditional_t<std::is_constructible<
-                                                         Object, Type>::value,
-                                                     Object,
-                                                     void  // Fallback if no
-                                                           // type matches
-                                                     >>>>>>>> {};
+                                  typename std::conditional<
+                                      std::is_constructible<Object,
+                                                            Type>::value,
+                                      Object, void>::type>::type>::type>::
+                          type>::type>::type>::type> {};
 
     template <class... Args>
     struct BestFitFor
-        : detail::TypeIdentity<typename std::conditional_t<
+        : detail::TypeIdentity<typename std::conditional<
               // Check for multi-arg constructors in a reasonable priority order
               std::is_constructible<String, Args...>::value, String,
-              std::conditional_t<
+              typename std::conditional<
                   std::is_constructible<Array, Args...>::value, Array,
-                  std::conditional_t<
+                  typename std::conditional<
                       std::is_constructible<Object, Args...>::value, Object,
-                      // Add other multi-arg constructible types here if needed
-                      void  // Fallback if no type has a matching constructor
-                      >>>> {};
+                      void>::type>::type>::type> {};
 
    private:
     using TagRepr = std::uint32_t;
