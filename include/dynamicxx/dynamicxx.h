@@ -240,10 +240,12 @@ class BasicDynamic {
               // Check for multi-arg constructors in a reasonable priority order
               std::is_constructible<String, Args...>::value, String,
               typename std::conditional<
-                  std::is_constructible<Array, Args...>::value, Array,
+                  std::is_constructible<Blob, Args...>::value, Blob,
                   typename std::conditional<
-                      std::is_constructible<Object, Args...>::value, Object,
-                      void>::type>::type>::type> {};
+                      std::is_constructible<Array, Args...>::value, Array,
+                      typename std::conditional<
+                          std::is_constructible<Object, Args...>::value, Object,
+                          void>::type>::type>::type>::type> {};
 
    private:
     using TagRepr = std::uint32_t;
