@@ -27,8 +27,8 @@ This project uses CMake to build examples and tests.
 
 3.  Run examples and tests:
     ```bash
-    ./build/Debug/example
-    ./build/Debug/run_tests
+    ./build/Debug/examples/example
+    ./build/Debug/tests/run_tests
     ```
 
 ## Usage
