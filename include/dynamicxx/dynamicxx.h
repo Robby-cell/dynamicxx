@@ -218,30 +218,32 @@ class BasicDynamic {
         : detail::TypeIdentity<typename std::conditional_t<
               detail::IsBool<Type>::value, Boolean,
               std::conditional_t<
-                  std::is_integral_v<Type>, Integer,
+                  std::is_integral<Type>::value, Integer,
                   std::conditional_t<
-                      std::is_floating_point_v<Type>, Number,
+                      std::is_floating_point<Type>::value, Number,
                       std::conditional_t<
-                          std::is_constructible_v<String, Type>, String,
+                          std::is_constructible<String, Type>::value, String,
                           std::conditional_t<
-                              std::is_constructible_v<Blob, Type>, Blob,
+                              std::is_constructible<Blob, Type>::value, Blob,
                               std::conditional_t<
-                                  std::is_constructible_v<Array, Type>, Array,
-                                  std::conditional_t<
-                                      std::is_constructible_v<Object, Type>,
-                                      Object,
-                                      void  // Fallback if no type matches
-                                      >>>>>>>> {};
+                                  std::is_constructible<Array, Type>::value,
+                                  Array,
+                                  std::conditional_t<std::is_constructible<
+                                                         Object, Type>::value,
+                                                     Object,
+                                                     void  // Fallback if no
+                                                           // type matches
+                                                     >>>>>>>> {};
 
     template <class... Args>
     struct BestFitFor
         : detail::TypeIdentity<typename std::conditional_t<
               // Check for multi-arg constructors in a reasonable priority order
-              std::is_constructible_v<String, Args...>, String,
+              std::is_constructible<String, Args...>::value, String,
               std::conditional_t<
-                  std::is_constructible_v<Array, Args...>, Array,
+                  std::is_constructible<Array, Args...>::value, Array,
                   std::conditional_t<
-                      std::is_constructible_v<Object, Args...>, Object,
+                      std::is_constructible<Object, Args...>::value, Object,
                       // Add other multi-arg constructible types here if needed
                       void  // Fallback if no type has a matching constructor
                       >>>> {};
