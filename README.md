@@ -22,7 +22,7 @@ This project uses CMake to build examples and tests.
 2.  Configure and build:
     ```bash
     cmake . --preset="debug"
-    cmake --build . --preset="default"
+    cmake --build . --preset="debug"
     ```
 
 3.  Run examples and tests:
