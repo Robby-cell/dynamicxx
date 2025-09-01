@@ -54,6 +54,24 @@ using DynamicxxMap = std::unordered_map<Ts...>;
 #endif
 
 #if DHAS_CXX_17
+#define DCONSTEXPR_17 constexpr
+#else
+#define DCONSTEXPR_17
+#endif
+
+#if DHAS_CXX_20
+#define DCONSTEXPR_20 constexpr
+#else
+#define DCONSTEXPR_20
+#endif
+
+#if DHAS_CXX_23
+#define DCONSTEXPR_23 constexpr
+#else
+#define DCONSTEXPR_23
+#endif
+
+#if DHAS_CXX_17
 #define DNODISCARD [[nodiscard]]
 #else
 #define DNODISCARD
@@ -153,7 +171,7 @@ template <class Type>
 using NonNull = Type;
 
 template <class Type>
-auto PointerOf(Type& value) -> NonNull<Type*> {
+constexpr auto PointerOf(Type& value) -> NonNull<Type*> {
     return std::addressof(value);
 }
 
@@ -182,26 +200,73 @@ struct DefaultFactory<std::shared_ptr<Type>> {
         return std::make_shared<Type>(std::forward<Args>(args)...);
     }
 };
+template <class Type>
+struct DefaultFactory<std::unique_ptr<Type>> {
+    template <class... Args>
+    std::unique_ptr<Type> operator()(Args&&... args) const noexcept(
+        noexcept(std::make_unique<Type>(std::forward<Args>(args)...))) {
+        return std::make_unique<Type>(std::forward<Args>(args)...);
+    }
+};
 
 template <class Type>
 Type DefaultOf() noexcept(noexcept(DefaultFactory<Type>{}())) {
     return DefaultFactory<Type>{}();
 }
 
+class ConverstionError : std::runtime_error {
+   public:
+    using std::runtime_error::runtime_error;
+};
+
+constexpr std::size_t StoUsz(const char* str, const std::size_t length) {
+#if DHAS_CXX_23
+    [[assume(str != nullptr)]];
+    [[assume(length > 0)]];
+#endif
+    std::size_t v = 0;
+    for (std::size_t i = 0; i < length; ++i) {
+        const auto n = str[i];
+        if (n < '0' || n > '9') {
+            throw ConverstionError(
+                "Invalid characters in conversion to std::size_t");
+        }
+        v *= 10;
+        v += (n - '0');
+    }
+    return v;
+}
+
+constexpr std::size_t Strlen(const char* str) noexcept {
+#if DHAS_CXX_23
+    [[assume(str != nullptr)]];
+#endif
+    std::size_t length = 0;
+    while (str[length]) {
+        ++length;
+    }
+    return length;
+}
+
 }  // namespace detail
 
 struct DefaultToIndex {
     template <class Type>
-    std::size_t Convert(Type value) const noexcept {
+    constexpr std::size_t Convert(Type value) const noexcept {
         return static_cast<std::size_t>(value);
     }
 
-    std::size_t Convert(const char* str) const noexcept {
-        return std::stoul(str);
+    constexpr std::size_t Convert(const char* str,
+                                  const std::size_t length) const {
+        return detail::StoUsz(str, length);
     }
 
-    std::size_t Convert(const std::string& str) const noexcept {
-        return std::stoul(str);
+    constexpr std::size_t Convert(const char* str) const {
+        return Convert(str, detail::Strlen(str));
+    }
+
+    constexpr std::size_t Convert(const std::string& str) const {
+        return detail::StoUsz(str.c_str(), str.length());
     }
 };
 
@@ -223,12 +288,12 @@ struct DefaultToString {
     }
 
     template <class String>
-    const String& Convert(const String& str) const {
+    constexpr const String& Convert(const String& str) const noexcept {
         return str;
     }
 
     template <class String>
-    const char* Convert(const char* str) const {
+    constexpr const char* Convert(const char* str) const noexcept {
         return str;
     }
 };
@@ -393,8 +458,8 @@ class BasicDynamic {
     }
 
     union Payload {
-        Payload() {}
-        ~Payload() {}
+        constexpr Payload() : undefined() {}
+        DCONSTEXPR_20 ~Payload() {}
 
         Null null;
         Boolean boolean;
@@ -408,8 +473,8 @@ class BasicDynamic {
     };
 
     struct Impl {
-        Impl() {}
-        ~Impl() { DestroyIfNeeded(); }
+        constexpr Impl() {}
+        DCONSTEXPR_20 ~Impl() { DestroyIfNeeded(); }
 
         Impl(const Impl& that) { CopyRaw(that); }
         Impl& operator=(const Impl& that) {
@@ -577,78 +642,78 @@ class BasicDynamic {
 
         template <>
         struct Caster<Boolean> {
-            DNODISCARD static Boolean& As(Impl& impl) {
+            DNODISCARD static constexpr Boolean& As(Impl& impl) {
                 return impl.payload_.boolean;
             }
-            DNODISCARD static const Boolean& As(const Impl& impl) {
+            DNODISCARD static constexpr const Boolean& As(const Impl& impl) {
                 return impl.payload_.boolean;
             }
         };
         template <>
         struct Caster<Integer> {
-            DNODISCARD static Integer& As(Impl& impl) {
+            DNODISCARD static constexpr Integer& As(Impl& impl) {
                 return impl.payload_.integer;
             }
-            DNODISCARD static const Integer& As(const Impl& impl) {
+            DNODISCARD static constexpr const Integer& As(const Impl& impl) {
                 return impl.payload_.integer;
             }
         };
         template <>
         struct Caster<Number> {
-            DNODISCARD static Number& As(Impl& impl) {
+            DNODISCARD static constexpr Number& As(Impl& impl) {
                 return impl.payload_.number;
             }
-            DNODISCARD static const Number& As(const Impl& impl) {
+            DNODISCARD static constexpr const Number& As(const Impl& impl) {
                 return impl.payload_.number;
             }
         };
         template <>
         struct Caster<String> {
-            DNODISCARD static String& As(Impl& impl) {
+            DNODISCARD static constexpr String& As(Impl& impl) {
                 return impl.payload_.string;
             }
-            DNODISCARD static const String& As(const Impl& impl) {
+            DNODISCARD static constexpr const String& As(const Impl& impl) {
                 return impl.payload_.string;
             }
         };
         template <>
         struct Caster<Array> {
-            DNODISCARD static Array& As(Impl& impl) {
+            DNODISCARD static constexpr Array& As(Impl& impl) {
                 return impl.payload_.array;
             }
-            DNODISCARD static const Array& As(const Impl& impl) {
+            DNODISCARD static constexpr const Array& As(const Impl& impl) {
                 return impl.payload_.array;
             }
         };
         template <>
         struct Caster<Blob> {
-            DNODISCARD static Blob& As(Impl& impl) {
+            DNODISCARD static constexpr Blob& As(Impl& impl) {
                 return impl.payload_.blob;
             }
-            DNODISCARD static const Blob& As(const Impl& impl) {
+            DNODISCARD static constexpr const Blob& As(const Impl& impl) {
                 return impl.payload_.blob;
             }
         };
         template <>
         struct Caster<Object> {
-            DNODISCARD static Object& As(Impl& impl) {
+            DNODISCARD static constexpr Object& As(Impl& impl) {
                 return impl.payload_.object;
             }
-            DNODISCARD static const Object& As(const Impl& impl) {
+            DNODISCARD static constexpr const Object& As(const Impl& impl) {
                 return impl.payload_.object;
             }
         };
 
         template <>
         struct Caster<Null> {
-            DNODISCARD static Null As(const Impl& impl) {
+            DNODISCARD static constexpr Null As(const Impl& impl) {
                 return impl.payload_.null;
             }
         };
 
        public:
         template <class CastType>
-        DNODISCARD CastType& As() {
+        DNODISCARD DCONSTEXPR_23 CastType& As() {
             if (Holds<CastType>()) {
                 return Caster<CastType>::As(*this);
             } else {
@@ -657,7 +722,7 @@ class BasicDynamic {
         }
 
         template <class CastType>
-        DNODISCARD const CastType& As() const {
+        DNODISCARD DCONSTEXPR_23 const CastType& As() const {
             if (Holds<CastType>()) {
                 return Caster<CastType>::As(*this);
             } else {
@@ -762,9 +827,11 @@ class BasicDynamic {
             return tag_ == TagOf<WantedTag>();
         }
 
-        void MoveRaw(Impl&& that) noexcept { return MoveRaw(that); }
+        DCONSTEXPR_20 void MoveRaw(Impl&& that) noexcept {
+            return MoveRaw(that);
+        }
 
-        void MoveRaw(Impl& that) noexcept {
+        DCONSTEXPR_20 void MoveRaw(Impl& that) noexcept {
             tag_ = that.tag_;
             switch (that.tag_) {
                 case Tag::Null: {
@@ -855,7 +922,7 @@ class BasicDynamic {
             throw std::runtime_error("Invalid tag. Terminating now");
         }
 
-        void DestroyIfNeeded() noexcept {
+        DCONSTEXPR_23 void DestroyIfNeeded() noexcept {
             switch (tag_) {
                 case Tag::Null: {
                     payload_.null.~Null();
@@ -914,7 +981,8 @@ class BasicDynamic {
     };
 
    protected:
-    BasicDynamic(ImplWrapper<Impl> impl) : impl_(std::move(impl)) {}
+    DCONSTEXPR_23 BasicDynamic(ImplWrapper<Impl> impl)
+        : impl_(std::move(impl)) {}
 
    public:
     BasicDynamic() : BasicDynamic(detail::DefaultOf<ImplWrapper<Impl>>()) {}
@@ -1141,7 +1209,7 @@ class BasicDynamic {
     }
 
     template <class Type>
-    void Push(Type&& value) {
+    DCONSTEXPR_20 void Push(Type&& value) {
         auto& array = As<Array>();
         array.emplace_back(
             BasicDynamic::From<typename BestFitFor<typename std::remove_cv<
@@ -1149,14 +1217,14 @@ class BasicDynamic {
                 std::forward<Type>(value)));
     }
 
-    DNODISCARD BasicDynamic Pop() {
+    DNODISCARD DCONSTEXPR_14 BasicDynamic Pop() {
         auto& array = As<Array>();
         auto back = std::move(array.back());
         array.pop_back();
         return back;
     }
 
-    DNODISCARD std::size_t size() const {
+    DNODISCARD DCONSTEXPR_14 std::size_t size() const {
         if (IsArray()) {
             return GetArray().size();
         } else if (IsObject()) {
@@ -1222,7 +1290,7 @@ template <class IntegerType, class NumberType, class StringType,
           template <class...> class ArrayContainerType,
           template <class...> class ObjectContainerType, class ToString,
           class ToIndex, template <class...> class ImplWrapper>
-struct IsBasicDynamicSpecialization<dynamicxx::BasicDynamic<
+struct IsBasicDynamicSpecialization<BasicDynamic<
     IntegerType, NumberType, StringType, BlobContainerType, ArrayContainerType,
     ObjectContainerType, ToString, ToIndex, ImplWrapper>> : std::true_type {};
 
