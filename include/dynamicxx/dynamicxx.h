@@ -1183,6 +1183,22 @@ using DynamicManaged =
                  DefaultObjectContainer, DefaultToString, DefaultToIndex,
                  std::shared_ptr>;
 
+namespace detail {
+
+template <class T>
+struct IsBasicDynamicSpecialization : std::false_type {};
+
+template <class IntegerType, class NumberType, class StringType,
+          template <class...> class BlobContainerType,
+          template <class...> class ArrayContainerType,
+          template <class...> class ObjectContainerType, class ToString,
+          class ToIndex, template <class...> class ImplWrapper>
+struct IsBasicDynamicSpecialization<dynamicxx::BasicDynamic<
+    IntegerType, NumberType, StringType, BlobContainerType, ArrayContainerType,
+    ObjectContainerType, ToString, ToIndex, ImplWrapper>> : std::true_type {};
+
+}  // namespace detail
+
 }  // namespace dynamicxx
 
 #endif  // DYNAMICXX_DYNAMICXX_H
