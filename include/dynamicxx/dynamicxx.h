@@ -26,10 +26,10 @@ using DynamicxxMap = std::unordered_map<Ts...>;
 #define DCXX_LANG (__cplusplus)
 #endif
 
-#define DHAS_CXX_14 (DCXX_LANG >= 201402UL)
-#define DHAS_CXX_17 (DCXX_LANG >= 201703UL)
-#define DHAS_CXX_20 (DCXX_LANG >= 202002UL)
-#define DHAS_CXX_23 (DCXX_LANG >= 202302UL)
+#define DHAS_CXX_14 (DCXX_LANG >= 201402L)
+#define DHAS_CXX_17 (DCXX_LANG >= 201703L)
+#define DHAS_CXX_20 (DCXX_LANG >= 202002L)
+#define DHAS_CXX_23 (DCXX_LANG >= 202302L)
 
 #if DHAS_CXX_14
 #define DCONSTEXPR_14 constexpr
@@ -51,7 +51,7 @@ using DynamicxxMap = std::unordered_map<Ts...>;
 #define UNLIKELY
 #endif
 
-#if __cpp_concepts >= 201907UL
+#if __cpp_concepts >= 201907L
 #define DHAS_CONCEPTS 1
 #else
 #define DHAS_CONCEPTS 0
