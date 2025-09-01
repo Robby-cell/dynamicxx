@@ -17,23 +17,24 @@
 #define DCXX_LANG (__cplusplus)
 #endif
 
-#define HAS_CXX_14 (DCXX_LANG >= 201402UL)
-#define HAS_CXX_17 (DCXX_LANG >= 201703UL)
-#define HAS_CXX_20 (DCXX_LANG >= 202002UL)
+#define DHAS_CXX_14 (DCXX_LANG >= 201402UL)
+#define DHAS_CXX_17 (DCXX_LANG >= 201703UL)
+#define DHAS_CXX_20 (DCXX_LANG >= 202002UL)
+#define DHAS_CXX_23 (DCXX_LANG >= 202302UL)
 
-#if HAS_CXX_14
+#if DHAS_CXX_14
 #define DCONSTEXPR_14 constexpr
 #else
 #define DCONSTEXPR_14
 #endif
 
-#if HAS_CXX_17
+#if DHAS_CXX_17
 #define DNODISCARD [[nodiscard]]
 #else
 #define DNODISCARD
 #endif
 
-#if HAS_CXX_20
+#if DHAS_CXX_20
 #define LIKELY [[likely]]
 #define UNLIKELY [[unlikely]]
 #else
@@ -1142,10 +1143,20 @@ class BasicDynamic {
         throw InvalidAccessException("Invalid access attempted");
     }
 
-    auto GetImpl() noexcept -> Impl& { return *detail::PointerOf(impl_); }
+    auto GetImpl() noexcept -> Impl& {
+        const auto ptr = detail::PointerOf(impl_);
+#if DHAS_CXX_23
+        [[assume(ptr != nullptr)]];
+#endif
+        return ptr;
+    }
 
     auto GetImpl() const noexcept -> const Impl& {
-        return *detail::PointerOf(impl_);
+        const auto ptr = detail::PointerOf(impl_);
+#if DHAS_CXX_23
+        [[assume(ptr != nullptr)]];
+#endif
+        return ptr;
     }
 
    private:
