@@ -1157,7 +1157,7 @@ class BasicDynamic {
 #if DHAS_CXX_23
         [[assume(ptr != nullptr)]];
 #endif
-        return ptr;
+        return *ptr;
     }
 
     auto GetImpl() const noexcept -> const Impl& {
@@ -1165,7 +1165,7 @@ class BasicDynamic {
 #if DHAS_CXX_23
         [[assume(ptr != nullptr)]];
 #endif
-        return ptr;
+        return *ptr;
     }
 
    private:
