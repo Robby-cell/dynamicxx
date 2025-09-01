@@ -34,7 +34,7 @@ TEST(DynamicTest, CopyConstructionAndAssignment) {
     Dynamic d = Dynamic::From<Dynamic::Array>(Size);
 
     constexpr auto PerformAsserts = [](const Dynamic& d) {
-        EXPECT_EQ(d.GetArray().size(), Size);
+        EXPECT_EQ(d.size(), Size);
         for (const auto& value : d.GetArray()) {
             EXPECT_TRUE(value.IsUndefined());
         }
@@ -64,9 +64,9 @@ TEST(DynamicTest, ManagedVersion) {
         managed.Push(v);
     }
 
-    ASSERT_EQ(managed.GetArray().size(), Values.size());
+    ASSERT_EQ(managed.size(), Values.size());
     {
-        for (std::size_t i = 0; i < Values.size(); ++i) {
+        for (std::size_t i = 0, size = Values.size(); i < size; ++i) {
             ASSERT_EQ(Values[i], managed[i]);
         }
     }
