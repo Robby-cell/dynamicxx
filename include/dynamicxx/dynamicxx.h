@@ -60,6 +60,48 @@ namespace dynamicxx {
 
 namespace detail {
 
+template <class...>
+using AlwaysTrueType = std::true_type;
+
+namespace container {
+
+struct HasReserveImpl {
+    template <class T>
+    static AlwaysTrueType<decltype(std::declval<T>().reserve(0))> test(void*);
+
+    template <class T>
+    static std::false_type test(...);
+};
+}  // namespace container
+
+template <class T>
+constexpr bool HasReserve() noexcept {
+    return decltype(container::HasReserveImpl::template test<T>(
+        nullptr))::value;
+}
+
+template <bool>
+struct Reserve;
+
+template <>
+struct Reserve<true> {
+    template <class T>
+    void operator()(T&& container, const std::size_t capacity) const {
+        std::forward<T>(container).reserve(capacity);
+    }
+};
+template <>
+struct Reserve<false> {
+    template <class T>
+    void operator()(T&& container, const std::size_t capacity) const noexcept {}
+};
+
+template <class T>
+void reserve(T&& container, const std::size_t capacity) noexcept(noexcept(
+    Reserve<HasReserve<T>()>{}(std::forward<T>(container), capacity))) {
+    Reserve<HasReserve<T>()>{}(std::forward<T>(container), capacity);
+}
+
 template <class Type>
 struct TypeIdentity {
     using type = Type;  // NOLINT
@@ -627,7 +669,7 @@ class BasicDynamic {
                 case Tag::Array: {
                     impl.EmplaceRaw<Array>();
                     auto& array = impl.As<Array>();
-                    array.reserve(payload_.array.size());
+                    detail::reserve(array, payload_.array.size());
                     for (const auto& value : payload_.array) {
                         array.emplace_back(value.Clone());
                     }
@@ -636,7 +678,7 @@ class BasicDynamic {
                 case Tag::Object: {
                     impl.EmplaceRaw<Object>();
                     auto& object = impl.As<Object>();
-                    object.reserve(payload_.object.size());
+                    detail::reserve(object, payload_.object.size());
                     for (const auto& value : payload_.object) {
                         object[value.first] = value.second.Clone();
                     }
@@ -1075,7 +1117,20 @@ class BasicDynamic {
         return back;
     }
 
+    DNODISCARD std::size_t size() const {
+        if (IsArray()) {
+            return GetArray().size();
+        } else if (IsObject()) {
+            return GetObject().size();
+        } else {
+            InvalidAccess();
+        }
+    }
+
     template <class Key>
+#if HAS_CONCEPTS
+        requires requires(Object o, Key k) { o.find(k); }
+#endif
     DNODISCARD bool Contains(const Key& key) const {
         const auto& self = As<Object>();
         return self.find(key) != self.end();
