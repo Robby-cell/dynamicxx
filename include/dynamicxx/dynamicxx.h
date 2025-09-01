@@ -8,8 +8,17 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
+
+#if __cpp_lib_flat_map >= 202207L
+#include <flat_map>
+template <class... Ts>
+using DynamicxxMap = std::flat_map<Ts...>;
+#else
+#include <unordered_map>
+template <class... Ts>
+using DynamicxxMap = std::unordered_map<Ts...>;
+#endif
 
 #ifdef _MSVC_LANG
 #define DCXX_LANG (_MSVC_LANG)
@@ -221,7 +230,7 @@ using DefaultBlobContainer = std::vector<Ts...>;
 template <class... Ts>
 using DefaultArrayContainer = std::vector<Ts...>;
 template <class... Ts>
-using DefaultObjectContainer = std::unordered_map<Ts...>;
+using DefaultObjectContainer = DynamicxxMap<Ts...>;
 
 template <class IntegerType = DefaultInteger, class NumberType = DefaultNumber,
           class StringType = DefaultString,
