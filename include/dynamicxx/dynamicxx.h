@@ -910,6 +910,19 @@ class BasicDynamic {
         return dynamic;
     }
 
+    template <class... Args>
+    DNODISCARD static BasicDynamic Of(Args&&... args) {
+        return BasicDynamic::From<typename BestFitFor<Args...>::type>(
+            std::forward<Args>(args)...);
+    }
+
+    template <class Arg>
+    DNODISCARD static BasicDynamic Of(Arg&& arg) {
+        return BasicDynamic::From<typename BestFitFor<typename std::remove_cv<
+            typename std::remove_reference<Arg>::type>::type>::type>(
+            std::forward<Arg>(arg));
+    }
+
     template <class Type, class... Args>
     void Emplace(Args&&... args) {
         GetImpl().template Emplace<Type>(std::forward<Args>(args)...);
