@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstddef>
+#include <utility>
 
 using dynamicxx::Dynamic;
 using dynamicxx::DynamicManaged;
@@ -52,6 +53,23 @@ TEST(DynamicTest, CopyConstructionAndAssignment) {
 
     const auto another_copy = d;
     ASSERT_EQ(d, another_copy);  // They should be deeply equal
+}
+
+TEST(DynamicTest, BasicDynamic_Of) {
+    static constexpr auto FortyTwo = 42;
+    const auto integer = Dynamic::Of(FortyTwo);
+    EXPECT_EQ(integer, FortyTwo);
+
+    static constexpr auto TheString = "Foobar string.";
+    const auto string = Dynamic::Of(TheString);
+    EXPECT_EQ(string, TheString);
+
+    auto number = Dynamic::Of(32.0);
+    EXPECT_TRUE(number.IsNumber());
+    auto stolen_number = std::move(number);
+    EXPECT_TRUE(stolen_number.IsNumber());
+    EXPECT_TRUE(number.IsUndefined());
+    EXPECT_FALSE(number.IsNumber());
 }
 
 TEST(DynamicTest, ManagedVersion) {
