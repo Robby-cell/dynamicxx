@@ -41,6 +41,16 @@
 #define UNLIKELY
 #endif
 
+#if __cpp_concepts >= 201907UL
+#define DHAS_CONCEPTS 1
+#else
+#define DHAS_CONCEPTS 0
+#endif
+
+#if DHAS_CONCEPTS
+#include <concepts>
+#endif
+
 #define DDO_ASSERT(...)      \
     do {                     \
         assert(__VA_ARGS__); \
@@ -213,6 +223,28 @@ class BasicDynamic {
     template <>
     struct BestFitFor<Object> : detail::TypeIdentity<Object> {};
 
+#if DHAS_CONCEPTS
+    template <class Type>
+        requires(detail::IsBool<Type>::value)
+    struct BestFitFor<Type> : detail::TypeIdentity<Boolean> {};
+    template <std::integral Type>
+    struct BestFitFor<Type> : detail::TypeIdentity<Integer> {};
+    template <std::floating_point Type>
+    struct BestFitFor<Type> : detail::TypeIdentity<Number> {};
+
+    template <class... Args>
+        requires(std::constructible_from<String, Args...>)
+    struct BestFitFor<Args...> : detail::TypeIdentity<String> {};
+    template <class... Args>
+        requires(std::constructible_from<Blob, Args...>)
+    struct BestFitFor<Args...> : detail::TypeIdentity<Blob> {};
+    template <class... Args>
+        requires(std::constructible_from<Array, Args...>)
+    struct BestFitFor<Args...> : detail::TypeIdentity<Array> {};
+    template <class... Args>
+        requires(std::constructible_from<Object, Args...>)
+    struct BestFitFor<Args...> : detail::TypeIdentity<Object> {};
+#else
     template <class Type>
     struct BestFitFor<Type>
         : detail::TypeIdentity<typename std::conditional<
@@ -246,6 +278,7 @@ class BasicDynamic {
                       typename std::conditional<
                           std::is_constructible<Object, Args...>::value, Object,
                           void>::type>::type>::type>::type> {};
+#endif  // ^^^ DHAS_CONCEPTS
 
    private:
     using TagRepr = std::uint32_t;
@@ -355,95 +388,95 @@ class BasicDynamic {
         }
 
         DNODISCARD DCONSTEXPR_14 Boolean GetBoolean() const {
-            if (HoldsBoolean()) LIKELY {
-                    return payload_.boolean;
-                }
-            else
+            if (HoldsBoolean()) {
+                LIKELY { return payload_.boolean; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         DNODISCARD DCONSTEXPR_14 Integer GetInteger() const {
-            if (HoldsInteger()) LIKELY {
-                    return payload_.integer;
-                }
-            else
+            if (HoldsInteger()) {
+                LIKELY { return payload_.integer; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         DNODISCARD DCONSTEXPR_14 Number GetNumber() const {
-            if (HoldsNumber()) LIKELY {
-                    return payload_.number;
-                }
-            else
+            if (HoldsNumber()) {
+                LIKELY { return payload_.number; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         DNODISCARD DCONSTEXPR_14 String& GetString() {
-            if (HoldsString()) LIKELY {
-                    return payload_.string;
-                }
-            else
+            if (HoldsString()) {
+                LIKELY { return payload_.string; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
         DNODISCARD DCONSTEXPR_14 const String& GetString() const {
-            if (HoldsString()) LIKELY {
-                    return payload_.string;
-                }
-            else
+            if (HoldsString()) {
+                LIKELY { return payload_.string; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         DNODISCARD DCONSTEXPR_14 Blob& GetBlob() {
-            if (HoldsBlob()) LIKELY {
-                    return payload_.blob;
-                }
-            else
+            if (HoldsBlob()) {
+                LIKELY { return payload_.blob; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
         DNODISCARD DCONSTEXPR_14 const Blob& GetBlob() const {
-            if (HoldsBlob()) LIKELY {
-                    return payload_.blob;
-                }
-            else
+            if (HoldsBlob()) {
+                LIKELY { return payload_.blob; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         DNODISCARD DCONSTEXPR_14 Array& GetArray() {
-            if (HoldsArray()) LIKELY {
-                    return payload_.array;
-                }
-            else
+            if (HoldsArray()) {
+                LIKELY { return payload_.array; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
         DNODISCARD DCONSTEXPR_14 const Array& GetArray() const {
-            if (HoldsArray()) LIKELY {
-                    return payload_.array;
-                }
-            else
+            if (HoldsArray()) {
+                LIKELY { return payload_.array; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         DNODISCARD DCONSTEXPR_14 Object& GetObject() {
-            if (HoldsObject()) LIKELY {
-                    return payload_.object;
-                }
-            else
+            if (HoldsObject()) {
+                LIKELY { return payload_.object; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
         DNODISCARD DCONSTEXPR_14 const Object& GetObject() const {
-            if (HoldsObject()) LIKELY {
-                    return payload_.object;
-                }
-            else
+            if (HoldsObject()) {
+                LIKELY { return payload_.object; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         DNODISCARD DCONSTEXPR_14 Null GetNull() const {
-            if (HoldsNull()) LIKELY {
-                    return payload_.null;
-                }
-            else
+            if (HoldsNull()) {
+                LIKELY { return payload_.null; }
+            } else {
                 UNLIKELY { InvalidAccess(); }
+            }
         }
 
         void Move(Impl& that) noexcept {
