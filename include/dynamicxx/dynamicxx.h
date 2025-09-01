@@ -793,6 +793,10 @@ class BasicDynamic {
                     payload_.null.~Null();
                     break;
                 }
+                case Tag::Boolean: {
+                    payload_.boolean.~Boolean();
+                    break;
+                }
                 case Tag::Integer: {
                     payload_.integer.~Integer();
                     break;
